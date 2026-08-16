@@ -31,37 +31,55 @@
 </script>
 
 <script type="text/babel" data-type="module" data-presets="react" crossorigin="anonymous">
-import React, { useState, useEffect, useCallback } from "https://esm.sh/react@18";
-import ReactDOM from "https://esm.sh/react-dom@18/client";
-import {
-  Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
-  ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox,
-} from "https://esm.sh/lucide-react@0.383.0?deps=react@18";
+let React, useState, useEffect, useCallback, ReactDOM;
+let Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
+  ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox;
+let initializeApp, getFirestore, doc, onSnapshot, setDoc;
+let firebaseApp, db, DOC_REF;
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore, doc, onSnapshot, setDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+try {
+  const reactMod = await import("https://esm.sh/react@18");
+  React = reactMod.default;
+  useState = reactMod.useState;
+  useEffect = reactMod.useEffect;
+  useCallback = reactMod.useCallback;
 
-/* =======================================================================
-   CONFIGURACIÓN DE FIREBASE
-   Reemplaza estos valores por los de TU proyecto de Firebase.
-   Los sacas de: Configuración del proyecto > Tus apps > Config del SDK.
-   ======================================================================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyCcP3zNEhz4t4rWUZIe3dWsk07ccE9ZIXs",
-  authDomain: "ubeet-tareas-1.firebaseapp.com",
-  projectId: "ubeet-tareas-1",
-  storageBucket: "ubeet-tareas-1.firebasestorage.app",
-  messagingSenderId: "1042880383081",
-  appId: "1:1042880383081:web:f925c3fd84d5b36a81faf8",
-  measurementId: "G-HXN2EGK5LM",
-};
+  const rdMod = await import("https://esm.sh/react-dom@18/client");
+  ReactDOM = rdMod.default;
 
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const DOC_REF = doc(db, "libro-puntos", "data");
-/* ======================================================================= */
+  const icons = await import("https://esm.sh/lucide-react@0.383.0?deps=react@18");
+  ({ Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
+    ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox } = icons);
+
+  const fbApp = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  initializeApp = fbApp.initializeApp;
+
+  const fbFirestore = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+  ({ getFirestore, doc, onSnapshot, setDoc } = fbFirestore);
+
+  /* =======================================================================
+     CONFIGURACIÓN DE FIREBASE
+     Reemplaza estos valores por los de TU proyecto de Firebase.
+     Los sacas de: Configuración del proyecto > Tus apps > Config del SDK.
+     ======================================================================= */
+  const firebaseConfig = {
+    apiKey: "AIzaSyCcP3zNEhz4t4rWUZIe3dWsk07ccE9ZIXs",
+    authDomain: "ubeet-tareas-1.firebaseapp.com",
+    projectId: "ubeet-tareas-1",
+    storageBucket: "ubeet-tareas-1.firebasestorage.app",
+    messagingSenderId: "1042880383081",
+    appId: "1:1042880383081:web:f925c3fd84d5b36a81faf8",
+    measurementId: "G-HXN2EGK5LM",
+  };
+
+  firebaseApp = initializeApp(firebaseConfig);
+  db = getFirestore(firebaseApp);
+  DOC_REF = doc(db, "libro-puntos", "data");
+  /* ======================================================================= */
+} catch (e) {
+  showError("No se pudieron cargar las librerías (React/Firebase):\n" + (e && e.message ? e.message : String(e)));
+  throw e;
+}
 
 // Misma contraseña para dueño y maestros, tal como se pidió.
 const STAFF_PASSWORD = "ubeet.tareas123";
@@ -177,7 +195,7 @@ function getBalance(data, userId) {
   return earned + granted + received - sent - spent;
 }
 
-export default function App() {
+function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1024,7 +1042,11 @@ function OwnerView({ data, setData, user, tab }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+try {
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+} catch (e) {
+  showError("Error al iniciar la app:\n" + (e && e.message ? e.message : String(e)));
+}
 </script>
 </body>
 </html>
