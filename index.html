@@ -205,11 +205,20 @@ function getBalance(data, userId) {
   return earned + granted + received - sent - spent;
 }
 
+const USER_STORAGE_KEY = "libro-puntos-sesion";
+
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem(USER_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const unsub = DOC_REF.onSnapshot(
@@ -245,6 +254,9 @@ function App() {
   const handleEnter = useCallback(
     (u) => {
       setUser(u);
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+      } catch {}
       persist({
         ...data,
         people: upsertPerson(data.people, { id: u.id, name: u.name, role: u.role }),
@@ -252,6 +264,13 @@ function App() {
     },
     [data, persist]
   );
+
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    try {
+      localStorage.removeItem(USER_STORAGE_KEY);
+    } catch {}
+  }, []);
 
   if (loading || !data) {
     return (
@@ -272,7 +291,7 @@ function App() {
       {!user ? (
         <Login onEnter={handleEnter} />
       ) : (
-        <Dashboard user={user} data={data} setData={persist} onLogout={() => setUser(null)} error={error} />
+        <Dashboard user={user} data={data} setData={persist} onLogout={handleLogout} error={error} />
       )}
     </div>
   );
