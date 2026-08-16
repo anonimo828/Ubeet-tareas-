@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Libro de Puntos</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useEffect, useCallback } from "https://esm.sh/react@18";
+import ReactDOM from "https://esm.sh/react-dom@18/client";
+import {
+  Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
+  ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox,
+} from "https://esm.sh/lucide-react@0.383.0?deps=react@18";
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, onSnapshot, setDoc,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* =======================================================================
+   CONFIGURACIÓN DE FIREBASE
+   Reemplaza estos valores por los de TU proyecto de Firebase.
+   Los sacas de: Configuración del proyecto > Tus apps > Config del SDK.
+   ======================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCcP3zNEhz4t4rWUZIe3dWsk07ccE9ZIXs",
+  authDomain: "ubeet-tareas-1.firebaseapp.com",
+  projectId: "ubeet-tareas-1",
+  storageBucket: "ubeet-tareas-1.firebasestorage.app",
+  messagingSenderId: "1042880383081",
+  appId: "1:1042880383081:web:f925c3fd84d5b36a81faf8",
+  measurementId: "G-HXN2EGK5LM",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const DOC_REF = doc(db, "libro-puntos", "data");
+/* ======================================================================= */
+
+// Misma contraseña para dueño y maestros, tal como se pidió.
+const STAFF_PASSWORD = "ubeet.tareas123";
+
+const COLORS = {
+  paper: "#EEF1EA",
+  paperDark: "#E3E7DC",
+  ink: "#20261F",
+  inkSoft: "#4B5245",
+  green: "#2F5233",
+  greenDark: "#233F27",
+  red: "#A8322A",
+  gold: "#B8860B",
+  goldSoft: "#D9B44A",
+  line: "#C9CDBE",
+  white: "#FBFAF6",
+};
+
+const font = {
+  display: { fontFamily: "'Fraunces', serif" },
+  body: { fontFamily: "'Inter', sans-serif" },
+  mono: { fontFamily: "'IBM Plex Mono', monospace" },
+};
+
+const SHADOW = "0 1px 2px rgba(32,38,31,0.06), 0 2px 6px rgba(32,38,31,0.04)";
+
+const inputStyle = {
+  border: `1px solid ${COLORS.line}`,
+  background: COLORS.paper,
+  color: COLORS.ink,
+};
+
+function primaryBtnStyle(enabled = true) {
+  return {
+    background: enabled ? COLORS.green : COLORS.line,
+    color: COLORS.white,
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: enabled ? "pointer" : "not-allowed",
+  };
+}
+
+function goldBtnStyle(enabled = true) {
+  return {
+    background: enabled ? COLORS.gold : COLORS.line,
+    color: COLORS.white,
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: enabled ? "pointer" : "not-allowed",
+  };
+}
+
+function outlineBtnStyle(color) {
+  return {
+    border: `1px solid ${color}`,
+    color,
+    background: "transparent",
+    fontWeight: 600,
+    fontSize: 12,
+  };
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+function normId(name) {
+  return name.trim().toLowerCase();
+}
+
+function upsertPerson(list, person) {
+  const idx = (list || []).findIndex((p) => p.id === person.id);
+  if (idx === -1) return [...(list || []), person];
+  const next = [...list];
+  next[idx] = { ...next[idx], ...person };
+  return next;
+}
+
+function defaultData() {
+  return {
+    teachers: [],
+    tasks: [],
+    submissions: [],
+    rewards: [
+      { id: uid(), name: "Salir 5 min antes", cost: 20 },
+      { id: uid(), name: "Elegir el asiento por un día", cost: 15 },
+      { id: uid(), name: "Sin tarea por un día", cost: 30 },
+    ],
+    redemptions: [],
+    people: [],
+    follows: [],
+    grants: [],
+    transfers: [],
+  };
+}
+
+function getBalance(data, userId) {
+  const earned = data.submissions
+    .filter((s) => s.studentId === userId && s.status === "aprobado")
+    .reduce((sum, s) => sum + s.points, 0);
+  const granted = (data.grants || [])
+    .filter((g) => g.toId === userId)
+    .reduce((sum, g) => sum + g.amount, 0);
+  const received = (data.transfers || [])
+    .filter((t) => t.toId === userId)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const sent = (data.transfers || [])
+    .filter((t) => t.fromId === userId)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const spent = data.redemptions
+    .filter((r) => r.studentId === userId && r.status !== "rechazado")
+    .reduce((sum, r) => sum + r.cost, 0);
+  return earned + granted + received - sent - spent;
+}
+
+export default function App() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      DOC_REF,
+      (snap) => {
+        if (snap.exists()) {
+          setData(snap.data());
+        } else {
+          const initial = defaultData();
+          setDoc(DOC_REF, initial).catch(() => {});
+          setData(initial);
+        }
+        setLoading(false);
+      },
+      () => {
+        setError("No se pudo conectar con Firebase. Revisa la configuración.");
+        setData(defaultData());
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const persist = useCallback(async (next) => {
+    setData(next);
+    try {
+      await setDoc(DOC_REF, next);
+      setError(null);
+    } catch {
+      setError("No se pudo guardar. Revisa tu conexión.");
+    }
+  }, []);
+
+  const handleEnter = useCallback(
+    (u) => {
+      setUser(u);
+      persist({
+        ...data,
+        people: upsertPerson(data.people, { id: u.id, name: u.name, role: u.role }),
+      });
+    },
+    [data, persist]
+  );
+
+  if (loading || !data) {
+    return (
+      <div
+        style={{ ...font.body, background: COLORS.paper, color: COLORS.ink }}
+        className="min-h-screen flex items-center justify-center"
+      >
+        <div className="flex items-center gap-3">
+          <Stamp className="animate-pulse" size={28} />
+          <span>Cargando el libro de puntos…</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...font.body, background: COLORS.paper, minHeight: "100vh" }}>
+      {!user ? (
+        <Login onEnter={handleEnter} />
+      ) : (
+        <Dashboard user={user} data={data} setData={persist} onLogout={() => setUser(null)} error={error} />
+      )}
+    </div>
+  );
+}
+
+/* ---------------- LOGIN ---------------- */
+
+function Login({ onEnter }) {
+  const [role, setRole] = useState("estudiante");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [pwError, setPwError] = useState(false);
+
+  const roles = [
+    { id: "dueno", label: "Dueño", icon: Crown, desc: "Administra maestros y premios" },
+    { id: "maestro", label: "Maestro", icon: GraduationCap, desc: "Crea tareas y da puntos" },
+    { id: "estudiante", label: "Estudiante", icon: Users, desc: "Entrega tareas y canjea premios" },
+  ];
+
+  const needsPassword = role === "dueno" || role === "maestro";
+
+  const submit = () => {
+    if (!name.trim()) return;
+    if (needsPassword) {
+      if (password !== STAFF_PASSWORD) {
+        setPwError(true);
+        return;
+      }
+      onEnter({ id: role === "dueno" ? "dueno" : normId(name), name: name.trim(), role });
+      return;
+    }
+    onEnter({ id: normId(name), name: name.trim(), role });
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-3 mb-8 justify-center">
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{ width: 44, height: 44, background: COLORS.green, boxShadow: SHADOW }}
+          >
+            <Stamp size={22} color={COLORS.white} />
+          </div>
+          <div>
+            <h1 style={{ ...font.display, color: COLORS.ink, fontSize: 26, lineHeight: 1.1 }}>Libro de Puntos</h1>
+            <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase">
+              Tareas, mérito y recompensas
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="rounded-lg p-6"
+          style={{ background: COLORS.white, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW }}
+        >
+          <p style={{ ...font.mono, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 1 }} className="mb-3 uppercase">
+            Elige tu rol
+          </p>
+          <div className="grid grid-cols-1 gap-2 mb-5">
+            {roles.map((r) => {
+              const Icon = r.icon;
+              const active = role === r.id;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => {
+                    setRole(r.id);
+                    setPassword("");
+                    setPwError(false);
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-md text-left transition"
+                  style={{
+                    border: `1px solid ${active ? COLORS.green : COLORS.line}`,
+                    background: active ? COLORS.paperDark : "transparent",
+                  }}
+                >
+                  <Icon size={20} color={active ? COLORS.green : COLORS.inkSoft} />
+                  <div className="flex-1">
+                    <div style={{ color: COLORS.ink, fontWeight: 600, fontSize: 14 }}>{r.label}</div>
+                    <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{r.desc}</div>
+                  </div>
+                  {(r.id === "dueno" || r.id === "maestro") && <Lock size={13} color={COLORS.inkSoft} />}
+                </button>
+              );
+            })}
+          </div>
+
+          <label style={{ ...font.mono, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase block mb-1">
+            Tu nombre
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Escribe tu nombre"
+            className="w-full p-3 rounded-md mb-4 outline-none"
+            style={inputStyle}
+          />
+
+          {needsPassword && (
+            <div className="mb-4">
+              <label style={{ ...font.mono, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase block mb-1">
+                Contraseña de acceso
+              </label>
+              <div className="relative">
+                <Lock size={15} color={COLORS.inkSoft} style={{ position: "absolute", left: 12, top: 13 }} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPwError(false);
+                  }}
+                  placeholder="Contraseña"
+                  className="w-full p-3 pl-9 rounded-md outline-none"
+                  style={{ ...inputStyle, border: `1px solid ${pwError ? COLORS.red : COLORS.line}` }}
+                />
+              </div>
+              {pwError && (
+                <p style={{ color: COLORS.red, fontSize: 12 }} className="mt-1">
+                  Contraseña incorrecta.
+                </p>
+              )}
+            </div>
+          )}
+
+          <button disabled={!name.trim()} onClick={submit} className="w-full p-3 rounded-md font-medium transition" style={primaryBtnStyle(!!name.trim())}>
+            Entrar
+          </button>
+        </div>
+        <p style={{ color: COLORS.inkSoft, fontSize: 12 }} className="text-center mt-4">
+          Los datos se guardan en Firebase y son visibles para todos los que usen esta página.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- SHELL ---------------- */
+
+const ROLE_LABEL = { dueno: "Dueño", maestro: "Maestro", estudiante: "Estudiante" };
+
+function Dashboard({ user, data, setData, onLogout, error }) {
+  const [tab, setTab] = useState(user.role === "estudiante" ? "tareas" : user.role === "maestro" ? "tareas" : "premios");
+
+  const tabsByRole = {
+    dueno: [
+      { id: "premios", label: "Premios" },
+      { id: "canjes", label: "Canjes" },
+      { id: "personas", label: "Personas" },
+    ],
+    maestro: [
+      { id: "tareas", label: "Tareas" },
+      { id: "personas", label: "Personas" },
+    ],
+    estudiante: [
+      { id: "tareas", label: "Tareas" },
+      { id: "entregas", label: "Mis entregas" },
+      { id: "premios", label: "Premios" },
+      { id: "personas", label: "Personas" },
+    ],
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 pb-16">
+      <header className="flex items-center justify-between gap-3 py-5 mb-2 flex-wrap" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: COLORS.green }}>
+            <Stamp size={16} color={COLORS.white} />
+          </div>
+          <span style={{ ...font.display, fontSize: 19, color: COLORS.ink }}>Libro de Puntos</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <PointsBadge points={getBalance(data, user.id)} />
+          <div className="text-right">
+            <div style={{ color: COLORS.ink, fontSize: 13, fontWeight: 600 }}>{user.name}</div>
+            <div style={{ ...font.mono, fontSize: 10, color: COLORS.inkSoft }} className="uppercase">
+              {ROLE_LABEL[user.role]}
+            </div>
+          </div>
+          <button onClick={onLogout} style={{ color: COLORS.inkSoft }} title="Salir">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="mb-4 p-2 rounded-md text-sm" style={{ background: "#F3DEDC", color: COLORS.red }}>
+          {error}
+        </div>
+      )}
+
+      <Tabs tabs={tabsByRole[user.role]} active={tab} onChange={setTab} />
+
+      {user.role === "dueno" && <OwnerView data={data} setData={setData} user={user} tab={tab} />}
+      {user.role === "maestro" && <TeacherView data={data} setData={setData} user={user} tab={tab} />}
+      {user.role === "estudiante" && <StudentView data={data} setData={setData} user={user} tab={tab} />}
+    </div>
+  );
+}
+
+function Tabs({ tabs, active, onChange }) {
+  return (
+    <div className="flex gap-1 mb-6 overflow-x-auto" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className="px-4 py-2 rounded-t-sm shrink-0 whitespace-nowrap transition"
+          style={{
+            ...font.body,
+            fontWeight: 600,
+            fontSize: 13,
+            color: active === t.id ? COLORS.green : COLORS.inkSoft,
+            borderBottom: active === t.id ? `2px solid ${COLORS.green}` : "2px solid transparent",
+            marginBottom: -1,
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Card({ children, style }) {
+  return (
+    <div className="rounded-lg p-4 mb-3" style={{ background: COLORS.white, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function Eyebrow({ children }) {
+  return (
+    <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1.2 }} className="uppercase mb-2">
+      {children}
+    </p>
+  );
+}
+
+function PointsBadge({ points }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ ...font.mono, background: "#F3E9CE", color: COLORS.gold, fontWeight: 600, fontSize: 13 }}>
+      <Coins size={13} /> {points}
+    </span>
+  );
+}
+
+function StampBadge({ status }) {
+  const map = {
+    aprobado: { label: "Aprobado", color: COLORS.green, bg: "#E4EBE0" },
+    pendiente: { label: "Pendiente", color: COLORS.gold, bg: "#F3E9CE" },
+    rechazado: { label: "Rechazado", color: COLORS.red, bg: "#F3DEDC" },
+  };
+  const s = map[status] || map.pendiente;
+  return (
+    <span
+      className="inline-flex items-center px-2 py-1"
+      style={{
+        ...font.mono,
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: 1.2,
+        color: s.color,
+        background: s.bg,
+        border: `1.5px dashed ${s.color}`,
+        borderRadius: 4,
+        transform: "rotate(-1.5deg)",
+        textTransform: "uppercase",
+      }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+function EmptyState({ icon: Icon, text }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <Icon size={26} style={{ color: COLORS.inkSoft, opacity: 0.5, marginBottom: 8 }} />
+      <p style={{ color: COLORS.inkSoft, fontSize: 13 }}>{text}</p>
+    </div>
+  );
+}
+
+/* ---------------- PERSONAS (seguir + pasar puntos) ---------------- */
+
+const ROLE_LABELS = { dueno: "Dueño", maestro: "Maestros", estudiante: "Estudiantes" };
+
+function PeopleTab({ data, setData, user }) {
+  const [openId, setOpenId] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const isGranter = user.role === "maestro" || user.role === "dueno";
+  const balance = getBalance(data, user.id);
+  const people = (data.people || []).filter((p) => p.id !== user.id);
+  const follows = data.follows || [];
+
+  const followingSet = new Set(follows.filter((f) => f.followerId === user.id).map((f) => f.followingId));
+  const followerCount = follows.filter((f) => f.followingId === user.id).length;
+
+  const toggleFollow = (targetId) => {
+    const exists = follows.some((f) => f.followerId === user.id && f.followingId === targetId);
+    const next = exists
+      ? follows.filter((f) => !(f.followerId === user.id && f.followingId === targetId))
+      : [...follows, { followerId: user.id, followingId: targetId }];
+    setData({ ...data, follows: next });
+  };
+
+  const openSend = (id) => {
+    setOpenId(openId === id ? null : id);
+    setAmount("");
+    setFormError("");
+  };
+
+  const sendPoints = (person) => {
+    const amt = parseInt(amount, 10);
+    if (!amt || amt <= 0) return setFormError("Escribe una cantidad válida.");
+    if (!isGranter && amt > balance) return setFormError("No tienes suficientes puntos.");
+
+    const entry = { id: uid(), fromId: user.id, fromName: user.name, toId: person.id, toName: person.name, amount: amt, at: Date.now() };
+    setData(
+      isGranter
+        ? { ...data, grants: [...(data.grants || []), entry] }
+        : { ...data, transfers: [...(data.transfers || []), entry] }
+    );
+    setOpenId(null);
+    setAmount("");
+  };
+
+  const recent = [
+    ...(data.grants || []).map((g) => ({ ...g, kind: "grant" })),
+    ...(data.transfers || []).map((t) => ({ ...t, kind: "transfer" })),
+  ]
+    .filter((r) => r.fromId === user.id || r.toId === user.id)
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 5);
+
+  const grouped = ["dueno", "maestro", "estudiante"]
+    .map((role) => ({ role, list: people.filter((p) => p.role === role) }))
+    .filter((g) => g.list.length > 0);
+
+  return (
+    <div>
+      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ color: COLORS.inkSoft, fontSize: 13 }}>
+          Sigues a <strong style={{ color: COLORS.ink }}>{followingSet.size}</strong> · Te siguen{" "}
+          <strong style={{ color: COLORS.ink }}>{followerCount}</strong>
+        </div>
+        {isGranter && (
+          <div style={{ ...font.mono, fontSize: 11, color: COLORS.green }} className="uppercase">
+            Puedes dar puntos libremente
+          </div>
+        )}
+      </Card>
+
+      {grouped.length === 0 && <EmptyState icon={Users} text="Todavía no hay nadie más registrado. En cuanto otras personas entren a la página, aparecerán aquí." />}
+
+      {grouped.map((g) => (
+        <div key={g.role} className="mb-4">
+          <Eyebrow>{ROLE_LABELS[g.role]}</Eyebrow>
+          {g.list.map((p) => (
+            <Card key={p.id}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span style={{ color: COLORS.ink, fontSize: 14 }}>{p.name}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleFollow(p.id)}
+                    className="px-2 py-1 rounded-md text-xs flex items-center gap-1 transition"
+                    style={{
+                      border: `1px solid ${COLORS.green}`,
+                      color: followingSet.has(p.id) ? COLORS.white : COLORS.green,
+                      background: followingSet.has(p.id) ? COLORS.green : "transparent",
+                    }}
+                  >
+                    {followingSet.has(p.id) ? <UserCheck size={13} /> : <UserPlus size={13} />}
+                    {followingSet.has(p.id) ? "Siguiendo" : "Seguir"}
+                  </button>
+                  <button onClick={() => openSend(p.id)} className="px-2 py-1 rounded-md text-xs flex items-center gap-1" style={outlineBtnStyle(COLORS.gold)}>
+                    <Send size={13} />
+                    {isGranter ? "Dar puntos" : "Pasar puntos"}
+                  </button>
+                </div>
+              </div>
+
+              {openId === p.id && (
+                <div className="mt-3 pt-3 flex items-center gap-2 flex-wrap" style={{ borderTop: `1px dashed ${COLORS.line}` }}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      setFormError("");
+                    }}
+                    placeholder="Cantidad"
+                    className="p-2 rounded-md outline-none w-28"
+                    style={inputStyle}
+                  />
+                  <button onClick={() => sendPoints(p)} className="px-3 py-2 rounded-md text-xs" style={goldBtnStyle(true)}>
+                    Confirmar
+                  </button>
+                  {formError && (
+                    <p style={{ color: COLORS.red, fontSize: 12 }} className="w-full">
+                      {formError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      ))}
+
+      {recent.length > 0 && (
+        <div className="mt-6">
+          <Eyebrow>Movimientos recientes</Eyebrow>
+          {recent.map((r) => (
+            <Card key={r.id}>
+              <div className="flex items-center justify-between text-sm">
+                <span style={{ color: COLORS.ink }}>
+                  {r.fromId === user.id ? `Le diste ${r.amount} a ${r.toName}` : `${r.fromName} te dio ${r.amount} puntos`}
+                </span>
+                <PointsBadge points={r.amount} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- MAESTRO ---------------- */
+
+function TeacherView({ data, setData, user, tab }) {
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [points, setPoints] = useState("");
+
+  const myTasks = data.tasks.filter((t) => t.createdBy === user.id);
+  const pending = data.submissions.filter(
+    (s) => s.status === "pendiente" && data.tasks.some((t) => t.id === s.taskId && t.createdBy === user.id)
+  );
+
+  const createTask = () => {
+    if (!title.trim() || !points || parseInt(points, 10) <= 0) return;
+    const task = {
+      id: uid(),
+      title: title.trim(),
+      description: desc.trim(),
+      points: parseInt(points, 10),
+      createdBy: user.id,
+      createdByName: user.name,
+      at: Date.now(),
+    };
+    setData({ ...data, tasks: [...data.tasks, task] });
+    setTitle("");
+    setDesc("");
+    setPoints("");
+  };
+
+  const deleteTask = (id) => setData({ ...data, tasks: data.tasks.filter((t) => t.id !== id) });
+
+  const decideSubmission = (sub, status) =>
+    setData({
+      ...data,
+      submissions: data.submissions.map((s) => (s.id === sub.id ? { ...s, status, reviewedAt: Date.now() } : s)),
+    });
+
+  if (tab === "personas") return <PeopleTab data={data} setData={setData} user={user} />;
+
+  return (
+    <div>
+      <Card>
+        <Eyebrow>Nueva tarea</Eyebrow>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título de la tarea" className="w-full p-3 rounded-md mb-2 outline-none" style={inputStyle} />
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Descripción (opcional)" rows={2} className="w-full p-3 rounded-md mb-2 outline-none" style={inputStyle} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="number"
+            min="1"
+            value={points}
+            onChange={(e) => setPoints(e.target.value)}
+            placeholder="Puntos"
+            className="p-3 rounded-md outline-none w-28"
+            style={inputStyle}
+          />
+          <button onClick={createTask} className="px-4 py-3 rounded-md text-sm flex items-center gap-1" style={primaryBtnStyle(!!title.trim() && !!points)}>
+            <Plus size={15} /> Crear tarea
+          </button>
+        </div>
+      </Card>
+
+      {pending.length > 0 && (
+        <div className="mb-4">
+          <Eyebrow>Entregas por revisar</Eyebrow>
+          {pending.map((s) => (
+            <Card key={s.id}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{s.taskTitle}</div>
+                  <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>
+                    {s.studentName} · {s.points} pts
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => decideSubmission(s, "aprobado")} className="p-2 rounded-md" style={{ background: COLORS.green, color: COLORS.white }} title="Aprobar">
+                    <Check size={15} />
+                  </button>
+                  <button onClick={() => decideSubmission(s, "rechazado")} className="p-2 rounded-md" style={{ background: COLORS.red, color: COLORS.white }} title="Rechazar">
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Eyebrow>Tus tareas</Eyebrow>
+      {myTasks.length === 0 && <EmptyState icon={ClipboardList} text="Aún no has creado ninguna tarea." />}
+      {myTasks
+        .slice()
+        .sort((a, b) => b.at - a.at)
+        .map((t) => (
+          <Card key={t.id}>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+                {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
+              </div>
+              <div className="flex items-center gap-2">
+                <PointsBadge points={t.points} />
+                <button onClick={() => deleteTask(t.id)} style={{ color: COLORS.red }} title="Eliminar tarea">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+          </Card>
+        ))}
+    </div>
+  );
+}
+
+/* ---------------- ESTUDIANTE ---------------- */
+
+function StudentView({ data, setData, user, tab }) {
+  const balance = getBalance(data, user.id);
+  const mySubmissions = data.submissions
+    .filter((s) => s.studentId === user.id)
+    .sort((a, b) => b.at - a.at);
+
+  const hasActiveSubmission = (taskId) =>
+    mySubmissions.some((s) => s.taskId === taskId && (s.status === "pendiente" || s.status === "aprobado"));
+
+  const submitTask = (task) => {
+    if (hasActiveSubmission(task.id)) return;
+    const submission = {
+      id: uid(),
+      studentId: user.id,
+      studentName: user.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      points: task.points,
+      status: "pendiente",
+      at: Date.now(),
+    };
+    setData({ ...data, submissions: [...data.submissions, submission] });
+  };
+
+  const redeem = (reward) => {
+    if (balance < reward.cost) return;
+    const redemption = {
+      id: uid(),
+      studentId: user.id,
+      studentName: user.name,
+      rewardId: reward.id,
+      rewardName: reward.name,
+      cost: reward.cost,
+      status: "pendiente",
+      at: Date.now(),
+    };
+    setData({ ...data, redemptions: [...data.redemptions, redemption] });
+  };
+
+  if (tab === "personas") return <PeopleTab data={data} setData={setData} user={user} />;
+
+  if (tab === "entregas") {
+    return (
+      <div>
+        <Eyebrow>Mis entregas</Eyebrow>
+        {mySubmissions.length === 0 && <EmptyState icon={Inbox} text="Todavía no has entregado ninguna tarea." />}
+        {mySubmissions.map((s) => (
+          <Card key={s.id}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{s.taskTitle}</div>
+                <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{s.points} pts</div>
+              </div>
+              <StampBadge status={s.status} />
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (tab === "premios") {
+    return (
+      <div>
+        <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: COLORS.inkSoft, fontSize: 13 }}>Tu saldo actual</span>
+          <PointsBadge points={balance} />
+        </Card>
+        <Eyebrow>Premios disponibles</Eyebrow>
+        {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
+        {data.rewards.map((r) => {
+          const canAfford = balance >= r.cost;
+          return (
+            <Card key={r.id}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+                  <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+                </div>
+                <button onClick={() => redeem(r)} className="px-3 py-2 rounded-md text-xs flex items-center gap-1" style={goldBtnStyle(canAfford)} disabled={!canAfford}>
+                  <Gift size={13} /> Canjear
+                </button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // tab === "tareas"
+  return (
+    <div>
+      <Eyebrow>Tareas disponibles</Eyebrow>
+      {data.tasks.length === 0 && <EmptyState icon={ClipboardList} text="Todavía no hay tareas asignadas." />}
+      {data.tasks
+        .slice()
+        .sort((a, b) => b.at - a.at)
+        .map((t) => {
+          const active = hasActiveSubmission(t.id);
+          const mySub = mySubmissions.find((s) => s.taskId === t.id && (s.status === "pendiente" || s.status === "aprobado"));
+          return (
+            <Card key={t.id}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+                  {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
+                  <div style={{ color: COLORS.inkSoft, fontSize: 11 }}>Por {t.createdByName}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PointsBadge points={t.points} />
+                  {active ? (
+                    <StampBadge status={mySub.status} />
+                  ) : (
+                    <button onClick={() => submitTask(t)} className="px-3 py-2 rounded-md text-xs flex items-center gap-1" style={primaryBtnStyle(true)}>
+                      <Send size={13} /> Entregar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+    </div>
+  );
+}
+
+/* ---------------- DUEÑO ---------------- */
+
+function OwnerView({ data, setData, user, tab }) {
+  const [rName, setRName] = useState("");
+  const [rCost, setRCost] = useState("");
+
+  const addReward = () => {
+    if (!rName.trim() || !rCost || parseInt(rCost, 10) <= 0) return;
+    setData({ ...data, rewards: [...data.rewards, { id: uid(), name: rName.trim(), cost: parseInt(rCost, 10) }] });
+    setRName("");
+    setRCost("");
+  };
+
+  const deleteReward = (id) => setData({ ...data, rewards: data.rewards.filter((r) => r.id !== id) });
+
+  const decideRedemption = (r, status) =>
+    setData({
+      ...data,
+      redemptions: data.redemptions.map((x) => (x.id === r.id ? { ...x, status, reviewedAt: Date.now() } : x)),
+    });
+
+  if (tab === "personas") return <PeopleTab data={data} setData={setData} user={user} />;
+
+  if (tab === "canjes") {
+    const sorted = data.redemptions.slice().sort((a, b) => {
+      if (a.status === "pendiente" && b.status !== "pendiente") return -1;
+      if (b.status === "pendiente" && a.status !== "pendiente") return 1;
+      return b.at - a.at;
+    });
+    return (
+      <div>
+        <Eyebrow>Canjes de premios</Eyebrow>
+        {sorted.length === 0 && <EmptyState icon={Gift} text="Todavía no hay canjes solicitados." />}
+        {sorted.map((r) => (
+          <Card key={r.id}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.rewardName}</div>
+                <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>
+                  {r.studentName} · {r.cost} pts
+                </div>
+              </div>
+              {r.status === "pendiente" ? (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => decideRedemption(r, "aprobado")} className="p-2 rounded-md" style={{ background: COLORS.green, color: COLORS.white }} title="Aprobar">
+                    <Check size={15} />
+                  </button>
+                  <button onClick={() => decideRedemption(r, "rechazado")} className="p-2 rounded-md" style={{ background: COLORS.red, color: COLORS.white }} title="Rechazar">
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <StampBadge status={r.status} />
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // tab === "premios"
+  return (
+    <div>
+      <Card>
+        <Eyebrow>Nuevo premio</Eyebrow>
+        <input value={rName} onChange={(e) => setRName(e.target.value)} placeholder="Nombre del premio" className="w-full p-3 rounded-md mb-2 outline-none" style={inputStyle} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="number"
+            min="1"
+            value={rCost}
+            onChange={(e) => setRCost(e.target.value)}
+            placeholder="Costo en puntos"
+            className="p-3 rounded-md outline-none w-40"
+            style={inputStyle}
+          />
+          <button onClick={addReward} className="px-4 py-3 rounded-md text-sm flex items-center gap-1" style={primaryBtnStyle(!!rName.trim() && !!rCost)}>
+            <Plus size={15} /> Agregar premio
+          </button>
+        </div>
+      </Card>
+
+      <Eyebrow>Premios actuales</Eyebrow>
+      {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
+      {data.rewards.map((r) => (
+        <Card key={r.id}>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+              <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+            </div>
+            <button onClick={() => deleteReward(r.id)} style={{ color: COLORS.red }} title="Eliminar premio">
+              <Trash2 size={15} />
+            </button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
