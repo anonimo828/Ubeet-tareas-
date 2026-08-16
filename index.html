@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Libro de Puntos</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
   body { margin: 0; }
@@ -22,7 +21,7 @@
     }
   }
   window.addEventListener('error', function (e) {
-    showError('Error: ' + (e.message || e.error || 'desconocido'));
+    showError('Error: ' + (e.message || (e.error && e.error.message) || 'desconocido'));
   });
   window.addEventListener('unhandledrejection', function (e) {
     var reason = e.reason;
@@ -30,60 +29,67 @@
   });
 </script>
 
-<script type="text/babel" data-type="module" data-presets="react" crossorigin="anonymous">
-let React, useState, useEffect, useCallback, ReactDOM;
-let Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
-  ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox;
-let initializeApp, getFirestore, doc, onSnapshot, setDoc;
-let firebaseApp, db, DOC_REF;
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-(async () => {
-try {
-  const reactMod = await import("https://esm.sh/react@18");
-  React = reactMod.default;
-  useState = reactMod.useState;
-  useEffect = reactMod.useEffect;
-  useCallback = reactMod.useCallback;
+<script type="text/babel" data-presets="react">
 
-  const rdMod = await import("https://esm.sh/react-dom@18/client");
-  ReactDOM = rdMod.default;
+const { useState, useEffect, useCallback } = React;
 
-  const icons = await import("https://esm.sh/lucide-react@0.383.0?deps=react@18");
-  ({ Stamp, Users, GraduationCap, Crown, Gift, Plus, Check, X, LogOut,
-    ClipboardList, Trash2, Coins, UserPlus, UserCheck, Send, Lock, Inbox } = icons);
+const firebaseConfig = {
+  apiKey: "AIzaSyCcP3zNEhz4t4rWUZIe3dWsk07ccE9ZIXs",
+  authDomain: "ubeet-tareas-1.firebaseapp.com",
+  projectId: "ubeet-tareas-1",
+  storageBucket: "ubeet-tareas-1.firebasestorage.app",
+  messagingSenderId: "1042880383081",
+  appId: "1:1042880383081:web:f925c3fd84d5b36a81faf8",
+  measurementId: "G-HXN2EGK5LM",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_REF = db.collection("libro-puntos").doc("data");
 
-  const fbApp = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-  initializeApp = fbApp.initializeApp;
-
-  const fbFirestore = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-  ({ getFirestore, doc, onSnapshot, setDoc } = fbFirestore);
-
-  /* =======================================================================
-     CONFIGURACIÓN DE FIREBASE
-     Reemplaza estos valores por los de TU proyecto de Firebase.
-     Los sacas de: Configuración del proyecto > Tus apps > Config del SDK.
-     ======================================================================= */
-  const firebaseConfig = {
-    apiKey: "AIzaSyCcP3zNEhz4t4rWUZIe3dWsk07ccE9ZIXs",
-    authDomain: "ubeet-tareas-1.firebaseapp.com",
-    projectId: "ubeet-tareas-1",
-    storageBucket: "ubeet-tareas-1.firebasestorage.app",
-    messagingSenderId: "1042880383081",
-    appId: "1:1042880383081:web:f925c3fd84d5b36a81faf8",
-    measurementId: "G-HXN2EGK5LM",
+function makeIcon(emoji) {
+  return function IconComp({ size, color, style, className, title }) {
+    return React.createElement(
+      "span",
+      {
+        className,
+        title,
+        style: {
+          fontSize: size || 16,
+          lineHeight: 1,
+          display: "inline-block",
+          color: color,
+          filter: color ? "none" : undefined,
+          ...(style || {}),
+        },
+      },
+      emoji
+    );
   };
-
-  firebaseApp = initializeApp(firebaseConfig);
-  db = getFirestore(firebaseApp);
-  DOC_REF = doc(db, "libro-puntos", "data");
-  /* ======================================================================= */
-
-  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-} catch (e) {
-  showError("No se pudieron cargar las librerías (React/Firebase):\n" + (e && e.message ? e.message : String(e)));
-  throw e;
 }
-})();
+const Stamp = makeIcon("\u{1F58B}\u{FE0F}");
+const Users = makeIcon("\u{1F465}");
+const GraduationCap = makeIcon("\u{1F393}");
+const Crown = makeIcon("\u{1F451}");
+const Gift = makeIcon("\u{1F381}");
+const Plus = makeIcon("+");
+const Check = makeIcon("\u{2713}");
+const X = makeIcon("\u{2715}");
+const LogOut = makeIcon("\u{23FB}");
+const ClipboardList = makeIcon("\u{1F4CB}");
+const Trash2 = makeIcon("\u{1F5D1}\u{FE0F}");
+const Coins = makeIcon("\u{1FA99}");
+const UserPlus = makeIcon("\u{1F464}+");
+const UserCheck = makeIcon("\u{1F464}\u{2713}");
+const Send = makeIcon("\u{27A4}");
+const Lock = makeIcon("\u{1F512}");
+const Inbox = makeIcon("\u{1F4E5}");
+
 
 // Misma contraseña para dueño y maestros, tal como se pidió.
 const STAFF_PASSWORD = "ubeet.tareas123";
@@ -206,14 +212,13 @@ function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      DOC_REF,
+    const unsub = DOC_REF.onSnapshot(
       (snap) => {
-        if (snap.exists()) {
+        if (snap.exists) {
           setData(snap.data());
         } else {
           const initial = defaultData();
-          setDoc(DOC_REF, initial).catch(() => {});
+          DOC_REF.set(initial).catch(() => {});
           setData(initial);
         }
         setLoading(false);
@@ -230,7 +235,7 @@ function App() {
   const persist = useCallback(async (next) => {
     setData(next);
     try {
-      await setDoc(DOC_REF, next);
+      await DOC_REF.set(next);
       setError(null);
     } catch {
       setError("No se pudo guardar. Revisa tu conexión.");
@@ -1044,6 +1049,13 @@ function OwnerView({ data, setData, user, tab }) {
       ))}
     </div>
   );
+}
+
+
+try {
+  ReactDOM.render(React.createElement(App), document.getElementById("root"));
+} catch (e) {
+  showError("Error al iniciar la app:\n" + (e && e.message ? e.message : String(e)));
 }
 
 </script>
