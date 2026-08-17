@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Libro de Puntos</title>
+<title>Ubeetareas</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -306,7 +306,7 @@ function App() {
       >
         <div className="flex items-center gap-3">
           <Stamp className="animate-pulse" size={28} />
-          <span>Cargando el libro de puntos…</span>
+          <span>Cargando Ubeetareas…</span>
         </div>
       </div>
     );
@@ -364,7 +364,7 @@ function Login({ onEnter }) {
             <Stamp size={22} color={COLORS.white} />
           </div>
           <div>
-            <h1 style={{ ...font.display, color: COLORS.ink, fontSize: 26, lineHeight: 1.1 }}>Libro de Puntos</h1>
+            <h1 style={{ ...font.display, color: COLORS.ink, fontSize: 26, lineHeight: 1.1 }}>Ubeetareas</h1>
             <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase">
               Tareas, mérito y recompensas
             </p>
@@ -487,7 +487,7 @@ function Dashboard({ user, data, setData, onLogout, error }) {
           <div className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: COLORS.green }}>
             <Stamp size={16} color={COLORS.white} />
           </div>
-          <span style={{ ...font.display, fontSize: 19, color: COLORS.ink }}>Libro de Puntos</span>
+          <span style={{ ...font.display, fontSize: 19, color: COLORS.ink }}>Ubeetareas</span>
         </div>
         <div className="flex items-center gap-3">
           <PointsBadge points={getBalance(data, user.id)} />
