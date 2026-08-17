@@ -92,7 +92,8 @@ const Inbox = makeIcon("\u{1F4E5}");
 
 
 // Misma contraseña para dueño y maestros, tal como se pidió.
-const STAFF_PASSWORD = "ubeet.tareas123";
+const OWNER_PASSWORD = "ubeet.tareas123";
+const TEACHER_PASSWORD = "UBEET.DIOS.ES.VIDA";
 
 const COLORS = {
   paper: "#EEF1EA",
@@ -341,7 +342,8 @@ function Login({ onEnter }) {
   const submit = () => {
     if (!name.trim()) return;
     if (needsPassword) {
-      if (password !== STAFF_PASSWORD) {
+      const expected = role === "dueno" ? OWNER_PASSWORD : TEACHER_PASSWORD;
+      if (password !== expected) {
         setPwError(true);
         return;
       }
