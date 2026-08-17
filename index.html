@@ -448,6 +448,7 @@ function Dashboard({ user, data, setData, onLogout, error }) {
       { id: "tareas", label: "Tareas" },
       { id: "entregas", label: "Mis entregas" },
       { id: "premios", label: "Premios" },
+      { id: "canjes", label: "Mis canjes" },
       { id: "personas", label: "Personas" },
     ],
   };
@@ -915,6 +916,32 @@ function StudentView({ data, setData, user, tab }) {
                 <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{s.points} pts</div>
               </div>
               <StampBadge status={s.status} />
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (tab === "canjes") {
+    const myRedemptions = data.redemptions
+      .filter((r) => r.studentId === user.id)
+      .sort((a, b) => b.at - a.at);
+    return (
+      <div>
+        <Eyebrow>Mis canjes</Eyebrow>
+        {myRedemptions.length === 0 && <EmptyState icon={Gift} text="Todavía no has canjeado ningún premio." />}
+        {myRedemptions.map((r) => (
+          <Card key={r.id}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.rewardName}</div>
+                <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+                {r.status === "rechazado" && (
+                  <div style={{ color: COLORS.inkSoft, fontSize: 11, marginTop: 2 }}>Se te devolvieron los puntos.</div>
+                )}
+              </div>
+              <StampBadge status={r.status} />
             </div>
           </Card>
         ))}
