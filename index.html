@@ -96,16 +96,16 @@ const OWNER_PASSWORD = "ubeet.tareas123";
 const TEACHER_PASSWORD = "UBEET.DIOS.ES.VIDA";
 
 const COLORS = {
-  paper: "#EEF1EA",
-  paperDark: "#E3E7DC",
-  ink: "#20261F",
-  inkSoft: "#4B5245",
-  green: "#2F5233",
-  greenDark: "#233F27",
-  red: "#A8322A",
-  gold: "#B8860B",
-  goldSoft: "#D9B44A",
-  line: "#C9CDBE",
+  paper: "#0B0C0A",
+  paperDark: "#171814",
+  ink: "#EDEFE7",
+  inkSoft: "#A9AE9E",
+  green: "#4C8A54",
+  greenDark: "#2F5233",
+  red: "#D6564A",
+  gold: "#D9A62E",
+  goldSoft: "#E8C875",
+  line: "#33362C",
   white: "#FBFAF6",
 };
 
@@ -373,7 +373,7 @@ function Login({ onEnter }) {
 
         <div
           className="rounded-lg p-6"
-          style={{ background: COLORS.white, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW }}
+          style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW }}
         >
           <p style={{ ...font.mono, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 1 }} className="mb-3 uppercase">
             Elige tu rol
@@ -544,7 +544,7 @@ function Tabs({ tabs, active, onChange }) {
 
 function Card({ children, style }) {
   return (
-    <div className="rounded-lg p-4 mb-3" style={{ background: COLORS.white, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW, ...style }}>
+    <div className="rounded-lg p-4 mb-3" style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, boxShadow: SHADOW, ...style }}>
       {children}
     </div>
   );
