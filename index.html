@@ -206,9 +206,25 @@ function getBalance(data, userId) {
 }
 
 const USER_STORAGE_KEY = "libro-puntos-sesion";
+const DATA_STORAGE_KEY = "libro-puntos-datos";
+
+function loadCachedData() {
+  try {
+    const saved = localStorage.getItem(DATA_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheData(next) {
+  try {
+    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(next));
+  } catch {}
+}
 
 function App() {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(() => loadCachedData());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(() => {
@@ -225,16 +241,24 @@ function App() {
       (snap) => {
         if (snap.exists) {
           setData(snap.data());
+          cacheData(snap.data());
+          setError(null);
         } else {
-          const initial = defaultData();
+          const initial = loadCachedData() || defaultData();
           DOC_REF.set(initial).catch(() => {});
           setData(initial);
+          cacheData(initial);
         }
         setLoading(false);
       },
       () => {
-        setError("No se pudo conectar con Firebase. Revisa la configuración.");
-        setData(defaultData());
+        const cached = loadCachedData();
+        setError(
+          cached
+            ? "No se pudo conectar con Firebase. Mostrando tu última copia guardada en este dispositivo; los cambios no se compartirán hasta que vuelva la conexión."
+            : "No se pudo conectar con Firebase. Revisa la configuración."
+        );
+        setData(cached || defaultData());
         setLoading(false);
       }
     );
@@ -243,11 +267,12 @@ function App() {
 
   const persist = useCallback(async (next) => {
     setData(next);
+    cacheData(next);
     try {
       await DOC_REF.set(next);
       setError(null);
     } catch {
-      setError("No se pudo guardar. Revisa tu conexión.");
+      setError("No se pudo guardar en Firebase (posible problema de permisos). Se guardó una copia en este dispositivo, pero avísale al administrador para revisar las reglas de Firestore.");
     }
   }, []);
 
