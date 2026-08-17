@@ -595,6 +595,19 @@ function PeopleTab({ data, setData, user }) {
   const followingSet = new Set(follows.filter((f) => f.followerId === user.id).map((f) => f.followingId));
   const followerCount = follows.filter((f) => f.followingId === user.id).length;
 
+  const isOwner = user.role === "dueno";
+
+  const deletePerson = (person) => {
+    if (!window.confirm(`¿Eliminar a ${person.name} de la lista? Su historial de tareas y puntos ya ganados no se borra, pero dejará de aparecer aquí y no podrá volver a entrar con el mismo nombre hasta registrarse de nuevo.`)) {
+      return;
+    }
+    setData({
+      ...data,
+      people: (data.people || []).filter((p) => p.id !== person.id),
+      follows: (data.follows || []).filter((f) => f.followerId !== person.id && f.followingId !== person.id),
+    });
+  };
+
   const toggleFollow = (targetId) => {
     const exists = follows.some((f) => f.followerId === user.id && f.followingId === targetId);
     const next = exists
@@ -676,6 +689,16 @@ function PeopleTab({ data, setData, user }) {
                     <Send size={13} />
                     {isGranter ? "Dar puntos" : "Pasar puntos"}
                   </button>
+                  {isOwner && (
+                    <button
+                      onClick={() => deletePerson(p)}
+                      className="px-2 py-1 rounded-md text-xs flex items-center gap-1"
+                      style={outlineBtnStyle(COLORS.red)}
+                      title="Eliminar persona"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
 
