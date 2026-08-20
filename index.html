@@ -213,8 +213,47 @@ function defaultData() {
     follows: [],
     grants: [],
     transfers: [],
+    messages: [],
+    confessions: [],
   };
 }
+
+const MAX_TASK_POINTS = 40;
+
+function getTotalEarned(data, userId) {
+  const fromTasks = data.submissions
+    .filter((s) => s.studentId === userId && s.status === "aprobado")
+    .reduce((sum, s) => sum + s.points, 0);
+  const fromGrants = (data.grants || []).filter((g) => g.toId === userId).reduce((sum, g) => sum + g.amount, 0);
+  const fromTransfers = (data.transfers || []).filter((t) => t.toId === userId).reduce((sum, t) => sum + t.amount, 0);
+  return fromTasks + fromGrants + fromTransfers;
+}
+
+const RANKS = [
+  { min: 0, name: "Aprendiz", icon: "\u{1F331}" },
+  { min: 50, name: "Constante", icon: "\u{1F4D8}" },
+  { min: 150, name: "Destacado", icon: "\u{2B50}" },
+  { min: 300, name: "Experto", icon: "\u{1F525}" },
+  { min: 600, name: "Maestro", icon: "\u{1F3C6}" },
+  { min: 1000, name: "Leyenda", icon: "\u{1F451}" },
+];
+
+function getRank(total) {
+  let current = RANKS[0];
+  for (const r of RANKS) if (total >= r.min) current = r;
+  const idx = RANKS.indexOf(current);
+  const next = RANKS[idx + 1];
+  return { ...current, next, progress: next ? (total - current.min) / (next.min - current.min) : 1 };
+}
+
+const BADGES = [
+  { id: "primer-paso", name: "Primer paso", icon: "\u{1F949}", desc: "1 tarea aprobada", check: (data, uid_) => data.submissions.filter((s) => s.studentId === uid_ && s.status === "aprobado").length >= 1 },
+  { id: "cumplidor", name: "Cumplidor", icon: "\u{1F948}", desc: "5 tareas aprobadas", check: (data, uid_) => data.submissions.filter((s) => s.studentId === uid_ && s.status === "aprobado").length >= 5 },
+  { id: "maquina", name: "Máquina", icon: "\u{1F947}", desc: "20 tareas aprobadas", check: (data, uid_) => data.submissions.filter((s) => s.studentId === uid_ && s.status === "aprobado").length >= 20 },
+  { id: "coleccionista", name: "Coleccionista", icon: "\u{1F381}", desc: "3 premios canjeados", check: (data, uid_) => data.redemptions.filter((r) => r.studentId === uid_ && r.status !== "rechazado").length >= 3 },
+  { id: "generoso", name: "Generoso", icon: "\u{1F91D}", desc: "Compartió puntos con 3 personas", check: (data, uid_) => new Set((data.transfers || []).filter((t) => t.fromId === uid_).map((t) => t.toId)).size >= 3 },
+  { id: "centurion", name: "Centurión", icon: "\u{1F4AF}", desc: "100 puntos ganados en total", check: (data, uid_) => getTotalEarned(data, uid_) >= 100 },
+];
 
 function getBalance(data, userId) {
   const earned = data.submissions
@@ -498,10 +537,14 @@ function Dashboard({ user, data, setData, onLogout, error }) {
       { id: "premios", label: "Premios" },
       { id: "canjes", label: "Canjes" },
       { id: "personas", label: "Personas" },
+      { id: "logros", label: "Logros" },
+      { id: "mensajes", label: "Mensajes" },
+      { id: "confesiones", label: "Confesiones" },
     ],
     maestro: [
       { id: "tareas", label: "Tareas" },
       { id: "personas", label: "Personas" },
+      { id: "mensajes", label: "Mensajes" },
     ],
     estudiante: [
       { id: "tareas", label: "Tareas" },
@@ -509,6 +552,9 @@ function Dashboard({ user, data, setData, onLogout, error }) {
       { id: "premios", label: "Premios" },
       { id: "canjes", label: "Mis canjes" },
       { id: "personas", label: "Personas" },
+      { id: "logros", label: "Logros" },
+      { id: "mensajes", label: "Mensajes" },
+      { id: "confesiones", label: "Confesiones" },
     ],
   };
 
@@ -543,9 +589,16 @@ function Dashboard({ user, data, setData, onLogout, error }) {
 
       <Tabs tabs={tabsByRole[user.role]} active={tab} onChange={setTab} />
 
-      {user.role === "dueno" && <OwnerView data={data} setData={setData} user={user} tab={tab} />}
-      {user.role === "maestro" && <TeacherView data={data} setData={setData} user={user} tab={tab} />}
-      {user.role === "estudiante" && <StudentView data={data} setData={setData} user={user} tab={tab} />}
+      {tab === "mensajes" && <MessagesTab data={data} setData={setData} user={user} />}
+      {tab === "confesiones" && <ConfessionsTab data={data} setData={setData} user={user} />}
+      {tab === "logros" && <LogrosTab data={data} user={user} />}
+      {tab !== "mensajes" && tab !== "confesiones" && tab !== "logros" && (
+        <>
+          {user.role === "dueno" && <OwnerView data={data} setData={setData} user={user} tab={tab} />}
+          {user.role === "maestro" && <TeacherView data={data} setData={setData} user={user} tab={tab} />}
+          {user.role === "estudiante" && <StudentView data={data} setData={setData} user={user} tab={tab} />}
+        </>
+      )}
     </div>
   );
 }
@@ -590,6 +643,18 @@ function Eyebrow({ children }) {
   );
 }
 
+function DueLabel({ dueAt }) {
+  if (!dueAt) return null;
+  const overdue = dueAt < Date.now();
+  const formatted = new Date(dueAt).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div style={{ ...font.mono, fontSize: 11, color: overdue ? COLORS.red : COLORS.inkSoft }} className="mt-1">
+      {overdue ? "Venció el " : "Vence el "}
+      {formatted}
+    </div>
+  );
+}
+
 function PointsBadge({ points }) {
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ ...font.mono, background: "#F3E9CE", color: "#8A6A16", fontWeight: 700, fontSize: 14 }}>
@@ -631,6 +696,195 @@ function EmptyState({ icon: Icon, text }) {
     <div className="flex flex-col items-center justify-center py-10 text-center">
       <Icon size={26} style={{ color: COLORS.inkSoft, opacity: 0.5, marginBottom: 8 }} />
       <p style={{ color: COLORS.inkSoft, fontSize: 13 }}>{text}</p>
+    </div>
+  );
+}
+
+/* ---------------- MENSAJES ---------------- */
+
+function MessagesTab({ data, setData, user }) {
+  const [activeId, setActiveId] = useState(null);
+  const [text, setText] = useState("");
+  const people = (data.people || []).filter((p) => p.id !== user.id);
+  const messages = data.messages || [];
+
+  const threadWith = (pid) =>
+    messages.filter((m) => (m.fromId === user.id && m.toId === pid) || (m.fromId === pid && m.toId === user.id)).sort((a, b) => a.at - b.at);
+
+  const lastMsg = (pid) => {
+    const t = threadWith(pid);
+    return t[t.length - 1];
+  };
+
+  const send = () => {
+    if (!text.trim() || !activeId) return;
+    const person = people.find((p) => p.id === activeId);
+    const msg = { id: uid(), fromId: user.id, fromName: user.name, toId: activeId, toName: person.name, text: text.trim(), at: Date.now() };
+    setData({ ...data, messages: [...messages, msg] });
+    setText("");
+  };
+
+  if (activeId) {
+    const person = people.find((p) => p.id === activeId);
+    const thread = threadWith(activeId);
+    return (
+      <div>
+        <button onClick={() => setActiveId(null)} className="mb-3 text-sm" style={{ color: COLORS.inkSoft }}>
+          &larr; Volver
+        </button>
+        <Eyebrow>{person ? person.name : "Conversación"}</Eyebrow>
+        <div className="mb-3" style={{ maxHeight: 420, overflowY: "auto" }}>
+          {thread.length === 0 && <EmptyState icon={Send} text="Todavía no hay mensajes. Escribe el primero." />}
+          {thread.map((m) => (
+            <div key={m.id} className="mb-2 flex" style={{ justifyContent: m.fromId === user.id ? "flex-end" : "flex-start" }}>
+              <div
+                className="px-3 py-2 rounded-lg"
+                style={{
+                  maxWidth: "75%",
+                  background: m.fromId === user.id ? COLORS.green : COLORS.paperDark,
+                  color: m.fromId === user.id ? COLORS.white : COLORS.ink,
+                  border: m.fromId === user.id ? "none" : `1px solid ${COLORS.line}`,
+                  fontSize: 13,
+                }}
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Escribe un mensaje..."
+            className="flex-1 p-3 rounded-md outline-none"
+            style={inputStyle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") send();
+            }}
+          />
+          <button onClick={send} className="px-4 py-3 rounded-md" style={primaryBtnStyle(!!text.trim())}>
+            <Send size={15} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Eyebrow>Mensajes</Eyebrow>
+      {people.length === 0 && <EmptyState icon={Send} text="Todavía no hay nadie más registrado." />}
+      {people.map((p) => {
+        const last = lastMsg(p.id);
+        return (
+          <Card key={p.id} style={{ cursor: "pointer" }}>
+            <div onClick={() => setActiveId(p.id)} className="flex items-center justify-between gap-2">
+              <div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 15, fontWeight: 700 }}>{p.name}</div>
+                <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{last ? last.text.slice(0, 42) : "Sin mensajes todavía"}</div>
+              </div>
+              <div style={{ ...font.mono, fontSize: 10, color: COLORS.inkSoft }} className="uppercase">
+                {ROLE_LABEL[p.role]}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- CONFESIONES ---------------- */
+
+function ConfessionsTab({ data, setData, user }) {
+  const [text, setText] = useState("");
+  const isOwner = user.role === "dueno";
+  const list = (data.confessions || []).slice().sort((a, b) => b.at - a.at);
+
+  const send = () => {
+    if (!text.trim()) return;
+    const c = { id: uid(), authorId: user.id, authorName: user.name, text: text.trim(), at: Date.now() };
+    setData({ ...data, confessions: [...(data.confessions || []), c] });
+    setText("");
+  };
+
+  return (
+    <div>
+      <Card>
+        <Eyebrow>Nueva confesión</Eyebrow>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          placeholder="Escribe lo que quieras contar..."
+          className="w-full p-3 rounded-md mb-2 outline-none"
+          style={inputStyle}
+        />
+        <button onClick={send} className="px-4 py-3 rounded-md text-sm flex items-center gap-1" style={primaryBtnStyle(!!text.trim())}>
+          <Send size={14} /> Enviar
+        </button>
+        <p style={{ color: COLORS.inkSoft, fontSize: 11 }} className="mt-2">
+          Otros estudiantes no ven tu nombre. Solo el dueño puede verlo.
+        </p>
+      </Card>
+      <Eyebrow>Confesiones</Eyebrow>
+      {list.length === 0 && <EmptyState icon={Inbox} text="Todavía no hay confesiones." />}
+      {list.map((c) => (
+        <Card key={c.id}>
+          <div style={{ color: COLORS.ink, fontSize: 14 }}>{c.text}</div>
+          <div style={{ ...font.mono, fontSize: 10, color: isOwner ? COLORS.gold : COLORS.inkSoft }} className="uppercase mt-2">
+            {isOwner ? `De: ${c.authorName}` : "Anónimo"}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- LOGROS (rangos + insignias) ---------------- */
+
+function LogrosTab({ data, user }) {
+  const total = getTotalEarned(data, user.id);
+  const rank = getRank(total);
+  return (
+    <div>
+      <Card style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 42 }}>{rank.icon}</div>
+        <div style={{ ...font.display, color: COLORS.ink, fontWeight: 700, fontSize: 22 }}>{rank.name}</div>
+        <div style={{ ...font.mono, color: COLORS.inkSoft, fontSize: 11 }} className="uppercase mt-1">
+          {total} pts ganados en total
+        </div>
+        {rank.next && (
+          <div className="mt-3">
+            <div style={{ height: 6, borderRadius: 3, background: COLORS.line, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.min(100, Math.round(rank.progress * 100))}%`, background: COLORS.gold }} />
+            </div>
+            <div style={{ color: COLORS.inkSoft, fontSize: 11 }} className="mt-1">
+              Faltan {rank.next.min - total} pts para {rank.next.name}
+            </div>
+          </div>
+        )}
+      </Card>
+      <Eyebrow>Insignias</Eyebrow>
+      <div className="grid grid-cols-2 gap-2">
+        {BADGES.map((b) => {
+          const earned = b.check(data, user.id);
+          return (
+            <div
+              key={b.id}
+              className="rounded-lg p-3 text-center"
+              style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, opacity: earned ? 1 : 0.35 }}
+            >
+              <div style={{ fontSize: 26 }}>{b.icon}</div>
+              <div style={{ color: COLORS.ink, fontSize: 12, fontWeight: 600 }} className="mt-1">
+                {b.name}
+              </div>
+              <div style={{ color: COLORS.inkSoft, fontSize: 10 }}>{b.desc}</div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -813,6 +1067,8 @@ function TeacherView({ data, setData, user, tab }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [points, setPoints] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [pointsError, setPointsError] = useState("");
 
   const myTasks = data.tasks.filter((t) => t.createdBy === user.id);
   const pending = data.submissions.filter(
@@ -820,12 +1076,19 @@ function TeacherView({ data, setData, user, tab }) {
   );
 
   const createTask = () => {
-    if (!title.trim() || !points || parseInt(points, 10) <= 0) return;
+    if (!title.trim() || !points) return;
+    const pts = parseInt(points, 10);
+    if (!pts || pts <= 0) return;
+    if (pts > MAX_TASK_POINTS) {
+      setPointsError(`El máximo por tarea es ${MAX_TASK_POINTS} puntos.`);
+      return;
+    }
     const task = {
       id: uid(),
       title: title.trim(),
       description: desc.trim(),
-      points: parseInt(points, 10),
+      points: pts,
+      dueAt: dueAt ? new Date(dueAt).getTime() : null,
       createdBy: user.id,
       createdByName: user.name,
       at: Date.now(),
@@ -834,6 +1097,8 @@ function TeacherView({ data, setData, user, tab }) {
     setTitle("");
     setDesc("");
     setPoints("");
+    setDueAt("");
+    setPointsError("");
   };
 
   const deleteTask = (id) => setData({ ...data, tasks: data.tasks.filter((t) => t.id !== id) });
@@ -852,20 +1117,39 @@ function TeacherView({ data, setData, user, tab }) {
         <Eyebrow>Nueva tarea</Eyebrow>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título de la tarea" className="w-full p-3 rounded-md mb-2 outline-none" style={inputStyle} />
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Descripción (opcional)" rows={2} className="w-full p-3 rounded-md mb-2 outline-none" style={inputStyle} />
+        <label style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase block mb-1">
+          Fecha y hora límite (opcional)
+        </label>
+        <input
+          type="datetime-local"
+          value={dueAt}
+          onChange={(e) => setDueAt(e.target.value)}
+          className="w-full p-3 rounded-md mb-2 outline-none"
+          style={inputStyle}
+        />
         <div className="flex items-center gap-2 flex-wrap">
           <input
             type="number"
             min="1"
+            max={MAX_TASK_POINTS}
             value={points}
-            onChange={(e) => setPoints(e.target.value)}
-            placeholder="Puntos"
-            className="p-3 rounded-md outline-none w-28"
+            onChange={(e) => {
+              setPoints(e.target.value);
+              setPointsError("");
+            }}
+            placeholder={`Puntos (máx ${MAX_TASK_POINTS})`}
+            className="p-3 rounded-md outline-none w-40"
             style={inputStyle}
           />
           <button onClick={createTask} className="px-4 py-3 rounded-md text-sm flex items-center gap-1" style={primaryBtnStyle(!!title.trim() && !!points)}>
             <Plus size={15} /> Crear tarea
           </button>
         </div>
+        {pointsError && (
+          <p style={{ color: COLORS.red, fontSize: 12 }} className="mt-2">
+            {pointsError}
+          </p>
+        )}
       </Card>
 
       {pending.length > 0 && (
@@ -905,6 +1189,7 @@ function TeacherView({ data, setData, user, tab }) {
               <div>
                 <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{t.title}</div>
                 {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
+                <DueLabel dueAt={t.dueAt} />
               </div>
               <div className="flex items-center gap-2">
                 <PointsBadge points={t.points} />
@@ -1055,6 +1340,7 @@ function StudentView({ data, setData, user, tab }) {
                   <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{t.title}</div>
                   {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
                   <div style={{ color: COLORS.inkSoft, fontSize: 11 }}>Por {t.createdByName}</div>
+                  <DueLabel dueAt={t.dueAt} />
                 </div>
                 <div className="flex items-center gap-2">
                   <PointsBadge points={t.points} />
