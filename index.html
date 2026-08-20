@@ -96,16 +96,17 @@ const OWNER_PASSWORD = "ubeet.tareas123";
 const TEACHER_PASSWORD = "UBEET.DIOS.ES.VIDA";
 
 const COLORS = {
-  paper: "#08090A",
-  paperDark: "#131513",
+  paper: "#0B1120",
+  paperDark: "#141B2E",
   ink: "#F5F4EC",
-  inkSoft: "#8D9186",
+  inkSoft: "#8D93A6",
   green: "#4C8A54",
   greenDark: "#2F5233",
   red: "#D6564A",
   gold: "#E0B03A",
   goldSoft: "#E8C875",
-  line: "#2A2C24",
+  pink: "#E14F8A",
+  line: "#232B42",
   white: "#FBFAF6",
 };
 
@@ -347,13 +348,18 @@ function App() {
 
   const handleEnter = useCallback(
     (u) => {
-      setUser(u);
+      const sessionUser = { id: u.id, name: u.name, role: u.role };
+      setUser(sessionUser);
       try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(sessionUser));
       } catch {}
+      const personRecord =
+        u.role === "estudiante"
+          ? { id: u.id, name: u.name, role: u.role, password: u.password }
+          : { id: u.id, name: u.name, role: u.role };
       persist({
         ...data,
-        people: upsertPerson(data.people, { id: u.id, name: u.name, role: u.role }),
+        people: upsertPerson(data.people, personRecord),
       });
     },
     [data, persist]
@@ -383,7 +389,7 @@ function App() {
   return (
     <div style={{ ...font.body, background: COLORS.paper, minHeight: "100vh" }}>
       {!user ? (
-        <Login onEnter={handleEnter} />
+        <Login onEnter={handleEnter} people={data.people} />
       ) : (
         <Dashboard user={user} data={data} setData={persist} onLogout={handleLogout} error={error} />
       )}
@@ -393,11 +399,12 @@ function App() {
 
 /* ---------------- LOGIN ---------------- */
 
-function Login({ onEnter }) {
+function Login({ onEnter, people }) {
   const [role, setRole] = useState("estudiante");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [pwError, setPwError] = useState(false);
+  const [pwErrorMsg, setPwErrorMsg] = useState("Contraseña incorrecta.");
 
   const roles = [
     { id: "dueno", label: "Dueño", icon: Crown, desc: "Administra maestros y premios" },
@@ -405,20 +412,44 @@ function Login({ onEnter }) {
     { id: "estudiante", label: "Estudiante", icon: Users, desc: "Entrega tareas y canjea premios" },
   ];
 
-  const needsPassword = role === "dueno" || role === "maestro";
+  // Todos los roles piden contraseña: dueño y maestro comparten una clave fija,
+  // y cada estudiante crea la suya propia la primera vez que entra con su nombre.
+  const needsPassword = true;
+
+  const studentId = normId(name);
+  const existingStudent =
+    role === "estudiante" && studentId ? (people || []).find((p) => p.id === studentId && p.role === "estudiante") : null;
+  const isNewStudentAccount = role === "estudiante" && !!studentId && !existingStudent;
 
   const submit = () => {
     if (!name.trim()) return;
-    if (needsPassword) {
+
+    if (role === "dueno" || role === "maestro") {
       const expected = role === "dueno" ? OWNER_PASSWORD : TEACHER_PASSWORD;
       if (password !== expected) {
+        setPwErrorMsg("Contraseña incorrecta.");
         setPwError(true);
         return;
       }
       onEnter({ id: role === "dueno" ? "dueno" : normId(name), name: name.trim(), role });
       return;
     }
-    onEnter({ id: normId(name), name: name.trim(), role });
+
+    // role === "estudiante": cada cuenta de estudiante queda protegida por su propia contraseña.
+    if (existingStudent && existingStudent.password) {
+      if (password !== existingStudent.password) {
+        setPwErrorMsg("Contraseña incorrecta. Si esta cuenta ya es tuya, escribe la contraseña que creaste antes.");
+        setPwError(true);
+        return;
+      }
+    } else {
+      if (!password || password.trim().length < 4) {
+        setPwErrorMsg("Crea una contraseña de al menos 4 caracteres para proteger tu cuenta.");
+        setPwError(true);
+        return;
+      }
+    }
+    onEnter({ id: studentId, name: name.trim(), role, password });
   };
 
   return (
@@ -472,7 +503,7 @@ function Login({ onEnter }) {
                     <div style={{ color: COLORS.ink, fontWeight: 600, fontSize: 14 }}>{r.label}</div>
                     <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{r.desc}</div>
                   </div>
-                  {(r.id === "dueno" || r.id === "maestro") && <Lock size={13} color={COLORS.inkSoft} />}
+                  <Lock size={13} color={COLORS.inkSoft} />
                 </button>
               );
             })}
@@ -492,7 +523,7 @@ function Login({ onEnter }) {
           {needsPassword && (
             <div className="mb-4">
               <label style={{ ...font.mono, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase block mb-1">
-                Contraseña de acceso
+                {role === "estudiante" ? "Tu contraseña" : "Contraseña de acceso"}
               </label>
               <div className="relative">
                 <Lock size={15} color={COLORS.inkSoft} style={{ position: "absolute", left: 12, top: 13 }} />
@@ -503,16 +534,22 @@ function Login({ onEnter }) {
                     setPassword(e.target.value);
                     setPwError(false);
                   }}
-                  placeholder="Contraseña"
+                  placeholder={isNewStudentAccount ? "Crea una contraseña" : "Contraseña"}
                   className="w-full p-3 pl-9 rounded-md outline-none"
                   style={{ ...inputStyle, border: `1px solid ${pwError ? COLORS.red : COLORS.line}` }}
                 />
               </div>
-              {pwError && (
+              {pwError ? (
                 <p style={{ color: COLORS.red, fontSize: 12 }} className="mt-1">
-                  Contraseña incorrecta.
+                  {pwErrorMsg}
                 </p>
-              )}
+              ) : role === "estudiante" && studentId ? (
+                <p style={{ color: COLORS.inkSoft, fontSize: 11 }} className="mt-1">
+                  {isNewStudentAccount
+                    ? "Es la primera vez que se usa este nombre: la contraseña que escribas quedará guardada para esta cuenta."
+                    : "Ya existe una cuenta con este nombre. Escribe la contraseña de esa cuenta para entrar."}
+                </p>
+              ) : null}
             </div>
           )}
 
