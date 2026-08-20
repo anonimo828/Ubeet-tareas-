@@ -231,12 +231,12 @@ function getTotalEarned(data, userId) {
 }
 
 const RANKS = [
-  { min: 0, name: "Aprendiz", icon: "\u{1F331}" },
-  { min: 50, name: "Constante", icon: "\u{1F4D8}" },
-  { min: 150, name: "Destacado", icon: "\u{2B50}" },
-  { min: 300, name: "Experto", icon: "\u{1F525}" },
-  { min: 600, name: "Maestro", icon: "\u{1F3C6}" },
-  { min: 1000, name: "Leyenda", icon: "\u{1F451}" },
+  { min: 0, name: "Aprendiz", icon: "\u{1F331}", color: COLORS.green },
+  { min: 50, name: "Constante", icon: "\u{1F4D8}", color: "#4C8FE0" },
+  { min: 150, name: "Destacado", icon: "\u{2B50}", color: COLORS.gold },
+  { min: 300, name: "Experto", icon: "\u{1F525}", color: "#E0703A" },
+  { min: 600, name: "Maestro", icon: "\u{1F3C6}", color: COLORS.pink },
+  { min: 1000, name: "Leyenda", icon: "\u{1F451}", color: COLORS.gold },
 ];
 
 function getRank(total) {
@@ -387,7 +387,13 @@ function App() {
   }
 
   return (
-    <div style={{ ...font.body, background: COLORS.paper, minHeight: "100vh" }}>
+    <div
+      style={{
+        ...font.body,
+        minHeight: "100vh",
+        background: `radial-gradient(120% 55% at 50% -8%, ${COLORS.pink}22 0%, transparent 60%), radial-gradient(90% 45% at 85% -4%, ${COLORS.gold}1c 0%, transparent 55%), ${COLORS.paper}`,
+      }}
+    >
       {!user ? (
         <Login onEnter={handleEnter} people={data.people} />
       ) : (
@@ -732,11 +738,26 @@ function StampBadge({ status }) {
   );
 }
 
-function EmptyState({ icon: Icon, text }) {
+function EmptyState({ icon: Icon, text, color }) {
+  const c = color || COLORS.inkSoft;
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center">
-      <Icon size={26} style={{ color: COLORS.inkSoft, opacity: 0.5, marginBottom: 8 }} />
-      <p style={{ color: COLORS.inkSoft, fontSize: 13 }}>{text}</p>
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div
+        style={{
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          background: `${c}20`,
+          border: `1px solid ${c}40`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 10,
+        }}
+      >
+        <Icon size={26} style={{ opacity: 0.9 }} />
+      </div>
+      <p style={{ color: COLORS.inkSoft, fontSize: 13, maxWidth: 230 }}>{text}</p>
     </div>
   );
 }
@@ -870,9 +891,14 @@ function MessagesTab({ data, setData, user }) {
         <button onClick={() => setActiveId(null)} className="mb-3 text-sm" style={{ color: COLORS.inkSoft }}>
           &larr; Volver
         </button>
-        <Eyebrow>{person ? person.name : "Conversación"}</Eyebrow>
+        <div className="flex items-center gap-2 mb-2">
+          <Avatar name={person ? person.name : "?"} size={30} ring={COLORS.green} />
+          <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1.2 }} className="uppercase">
+            {person ? person.name : "Conversación"}
+          </p>
+        </div>
         <div className="mb-3" style={{ maxHeight: 420, overflowY: "auto" }}>
-          {thread.length === 0 && <EmptyState icon={Send} text="Todavía no hay mensajes. Escribe el primero." />}
+          {thread.length === 0 && <EmptyState icon={Send} text="Todavía no hay mensajes. Escribe el primero." color={COLORS.green} />}
           {thread.map((m) => (
             <div key={m.id} className="mb-2 flex" style={{ justifyContent: m.fromId === user.id ? "flex-end" : "flex-start" }}>
               <div
@@ -912,17 +938,23 @@ function MessagesTab({ data, setData, user }) {
   return (
     <div>
       <Eyebrow>Mensajes</Eyebrow>
-      {people.length === 0 && <EmptyState icon={Send} text="Todavía no hay nadie más registrado." />}
+      {people.length === 0 && <EmptyState icon={Send} text="Todavía no hay nadie más registrado." color={COLORS.green} />}
       {people.map((p) => {
         const last = lastMsg(p.id);
+        const ring = p.role === "estudiante" ? COLORS.green : p.role === "maestro" ? "#4C8FE0" : COLORS.gold;
         return (
           <Card key={p.id} style={{ cursor: "pointer" }}>
-            <div onClick={() => setActiveId(p.id)} className="flex items-center justify-between gap-2">
-              <div>
-                <div style={{ ...font.display, color: COLORS.ink, fontSize: 15, fontWeight: 700 }}>{p.name}</div>
-                <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{last ? last.text.slice(0, 42) : "Sin mensajes todavía"}</div>
+            <div onClick={() => setActiveId(p.id)} className="flex items-center gap-3">
+              <Avatar name={p.name} size={40} ring={ring} />
+              <div className="flex-1 min-w-0">
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 15, fontWeight: 700 }} className="truncate">
+                  {p.name}
+                </div>
+                <div style={{ color: COLORS.inkSoft, fontSize: 12 }} className="truncate">
+                  {last ? last.text.slice(0, 42) : "Sin mensajes todavía"}
+                </div>
               </div>
-              <div style={{ ...font.mono, fontSize: 10, color: COLORS.inkSoft }} className="uppercase">
+              <div style={{ ...font.mono, fontSize: 10, color: COLORS.inkSoft }} className="uppercase shrink-0">
                 {ROLE_LABEL[p.role]}
               </div>
             </div>
@@ -949,8 +981,31 @@ function ConfessionsTab({ data, setData, user }) {
 
   return (
     <div>
-      <Card>
-        <Eyebrow>Nueva confesión</Eyebrow>
+      <Card
+        style={{
+          background: `linear-gradient(135deg, ${COLORS.pink}18, transparent 55%), ${COLORS.paperDark}`,
+          border: `1px solid ${COLORS.pink}40`,
+        }}
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: `${COLORS.pink}30`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Lock size={12} color={COLORS.pink} />
+          </div>
+          <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1.2 }} className="uppercase">
+            Nueva confesión
+          </p>
+        </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -967,15 +1022,21 @@ function ConfessionsTab({ data, setData, user }) {
         </p>
       </Card>
       <Eyebrow>Confesiones</Eyebrow>
-      {list.length === 0 && <EmptyState icon={Inbox} text="Todavía no hay confesiones." />}
-      {list.map((c) => (
-        <Card key={c.id}>
-          <div style={{ color: COLORS.ink, fontSize: 14 }}>{c.text}</div>
-          <div style={{ ...font.mono, fontSize: 10, color: isOwner ? COLORS.gold : COLORS.inkSoft }} className="uppercase mt-2">
-            {isOwner ? `De: ${c.authorName}` : "Anónimo"}
-          </div>
-        </Card>
-      ))}
+      {list.length === 0 && <EmptyState icon={Inbox} text="Todavía no hay confesiones." color={COLORS.pink} />}
+      {list.map((c, i) => {
+        const cc = rewardColor(i);
+        return (
+          <Card key={c.id} style={{ borderLeft: `3px solid ${cc}` }}>
+            <div style={{ color: cc, fontSize: 30, ...font.display, lineHeight: 0.4, opacity: 0.55 }} className="mb-1">
+              &ldquo;
+            </div>
+            <div style={{ color: COLORS.ink, fontSize: 14 }}>{c.text}</div>
+            <div style={{ ...font.mono, fontSize: 10, color: isOwner ? COLORS.gold : COLORS.inkSoft }} className="uppercase mt-2">
+              {isOwner ? `De: ${c.authorName}` : "Anónimo"}
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -987,8 +1048,30 @@ function LogrosTab({ data, user }) {
   const rank = getRank(total);
   return (
     <div>
-      <Card style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 42 }}>{rank.icon}</div>
+      <Card
+        style={{
+          textAlign: "center",
+          background: `radial-gradient(120% 100% at 50% 0%, ${rank.color}2A 0%, transparent 70%), ${COLORS.paperDark}`,
+          border: `1px solid ${rank.color}55`,
+        }}
+      >
+        <div
+          className="mx-auto"
+          style={{
+            width: 68,
+            height: 68,
+            borderRadius: "50%",
+            background: `${rank.color}25`,
+            border: `1.5px solid ${rank.color}70`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 34,
+            marginBottom: 6,
+          }}
+        >
+          {rank.icon}
+        </div>
         <div style={{ ...font.display, color: COLORS.ink, fontWeight: 700, fontSize: 22 }}>{rank.name}</div>
         <div style={{ ...font.mono, color: COLORS.inkSoft, fontSize: 11 }} className="uppercase mt-1">
           {total} pts ganados en total
@@ -996,7 +1079,7 @@ function LogrosTab({ data, user }) {
         {rank.next && (
           <div className="mt-3">
             <div style={{ height: 6, borderRadius: 3, background: COLORS.line, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${Math.min(100, Math.round(rank.progress * 100))}%`, background: COLORS.gold }} />
+              <div style={{ height: "100%", width: `${Math.min(100, Math.round(rank.progress * 100))}%`, background: rank.color }} />
             </div>
             <div style={{ color: COLORS.inkSoft, fontSize: 11 }} className="mt-1">
               Faltan {rank.next.min - total} pts para {rank.next.name}
@@ -1006,15 +1089,36 @@ function LogrosTab({ data, user }) {
       </Card>
       <Eyebrow>Insignias</Eyebrow>
       <div className="grid grid-cols-2 gap-2">
-        {BADGES.map((b) => {
+        {BADGES.map((b, i) => {
           const earned = b.check(data, user.id);
+          const c = rewardColor(i);
           return (
             <div
               key={b.id}
               className="rounded-lg p-3 text-center"
-              style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, opacity: earned ? 1 : 0.35 }}
+              style={{
+                background: earned ? `${c}15` : COLORS.paperDark,
+                border: earned ? `1px solid ${c}60` : `1px dashed ${COLORS.line}`,
+                opacity: earned ? 1 : 0.45,
+              }}
             >
-              <div style={{ fontSize: 26 }}>{b.icon}</div>
+              <div
+                className="mx-auto"
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: "50%",
+                  background: earned ? `${c}30` : "transparent",
+                  border: earned ? `1px solid ${c}70` : `1px solid ${COLORS.line}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  marginBottom: 4,
+                }}
+              >
+                {b.icon}
+              </div>
               <div style={{ color: COLORS.ink, fontSize: 12, fontWeight: 600 }} className="mt-1">
                 {b.name}
               </div>
@@ -1091,7 +1195,7 @@ function LeaderboardTab({ data, user }) {
         ))}
       </div>
 
-      {ranked.length === 0 && <EmptyState icon={Crown} text="Todavía no hay estudiantes con puntos en este periodo." />}
+      {ranked.length === 0 && <EmptyState icon={Crown} text="Todavía no hay estudiantes con puntos en este periodo." color={COLORS.gold} />}
 
       {top3.length > 0 && (
         <div className="flex items-end justify-center gap-3 mb-5 pt-2">
@@ -1214,10 +1318,50 @@ function PeopleTab({ data, setData, user }) {
 
   return (
     <div>
-      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ color: COLORS.inkSoft, fontSize: 13 }}>
-          Sigues a <strong style={{ color: COLORS.ink }}>{followingSet.size}</strong> · Te siguen{" "}
-          <strong style={{ color: COLORS.ink }}>{followerCount}</strong>
+      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "#4C8FE030",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <UserPlus size={14} color="#4C8FE0" />
+            </div>
+            <div>
+              <div style={{ color: COLORS.ink, fontSize: 15, fontWeight: 700 }}>{followingSet.size}</div>
+              <div style={{ ...font.mono, color: COLORS.inkSoft, fontSize: 9 }} className="uppercase">
+                Sigues
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: `${COLORS.pink}30`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <UserCheck size={14} color={COLORS.pink} />
+            </div>
+            <div>
+              <div style={{ color: COLORS.ink, fontSize: 15, fontWeight: 700 }}>{followerCount}</div>
+              <div style={{ ...font.mono, color: COLORS.inkSoft, fontSize: 9 }} className="uppercase">
+                Te siguen
+              </div>
+            </div>
+          </div>
         </div>
         {isGranter && (
           <div style={{ ...font.mono, fontSize: 11, color: COLORS.green }} className="uppercase">
@@ -1226,7 +1370,7 @@ function PeopleTab({ data, setData, user }) {
         )}
       </Card>
 
-      {grouped.length === 0 && <EmptyState icon={Users} text="Todavía no hay nadie más registrado. En cuanto otras personas entren a la página, aparecerán aquí." />}
+      {grouped.length === 0 && <EmptyState icon={Users} text="Todavía no hay nadie más registrado. En cuanto otras personas entren a la página, aparecerán aquí." color={"#4C8FE0"} />}
 
       {grouped.map((g) => (
         <div key={g.role} className="mb-4">
@@ -1431,7 +1575,7 @@ function TeacherView({ data, setData, user, tab }) {
       )}
 
       <Eyebrow>Tus tareas</Eyebrow>
-      {myTasks.length === 0 && <EmptyState icon={ClipboardList} text="Aún no has creado ninguna tarea." />}
+      {myTasks.length === 0 && <EmptyState icon={ClipboardList} text="Aún no has creado ninguna tarea." color={COLORS.green} />}
       {myTasks
         .slice()
         .sort((a, b) => b.at - a.at)
@@ -1503,7 +1647,7 @@ function StudentView({ data, setData, user, tab }) {
     return (
       <div>
         <Eyebrow>Mis entregas</Eyebrow>
-        {mySubmissions.length === 0 && <EmptyState icon={Inbox} text="Todavía no has entregado ninguna tarea." />}
+        {mySubmissions.length === 0 && <EmptyState icon={Inbox} text="Todavía no has entregado ninguna tarea." color={COLORS.green} />}
         {mySubmissions.map((s) => (
           <Card key={s.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1526,7 +1670,7 @@ function StudentView({ data, setData, user, tab }) {
     return (
       <div>
         <Eyebrow>Mis canjes</Eyebrow>
-        {myRedemptions.length === 0 && <EmptyState icon={Gift} text="Todavía no has canjeado ningún premio." />}
+        {myRedemptions.length === 0 && <EmptyState icon={Gift} text="Todavía no has canjeado ningún premio." color={COLORS.pink} />}
         {myRedemptions.map((r) => (
           <Card key={r.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1578,7 +1722,7 @@ function StudentView({ data, setData, user, tab }) {
         )}
 
         <Eyebrow>Premios disponibles</Eyebrow>
-        {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
+        {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." color={COLORS.pink} />}
         <div className="grid grid-cols-2 gap-3">
           {data.rewards.map((r, i) => {
             const canAfford = balance >= r.cost;
@@ -1611,7 +1755,7 @@ function StudentView({ data, setData, user, tab }) {
   return (
     <div>
       <Eyebrow>Tareas disponibles</Eyebrow>
-      {data.tasks.length === 0 && <EmptyState icon={ClipboardList} text="Todavía no hay tareas asignadas." />}
+      {data.tasks.length === 0 && <EmptyState icon={ClipboardList} text="Todavía no hay tareas asignadas." color={COLORS.gold} />}
       {data.tasks
         .slice()
         .sort((a, b) => b.at - a.at)
@@ -1677,7 +1821,7 @@ function OwnerView({ data, setData, user, tab }) {
     return (
       <div>
         <Eyebrow>Canjes de premios</Eyebrow>
-        {sorted.length === 0 && <EmptyState icon={Gift} text="Todavía no hay canjes solicitados." />}
+        {sorted.length === 0 && <EmptyState icon={Gift} text="Todavía no hay canjes solicitados." color={COLORS.pink} />}
         {sorted.map((r) => (
           <Card key={r.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1729,7 +1873,7 @@ function OwnerView({ data, setData, user, tab }) {
       </Card>
 
       <Eyebrow>Premios actuales</Eyebrow>
-      {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
+      {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." color={COLORS.pink} />}
       {data.rewards.map((r, i) => (
         <Card key={r.id}>
           <div className="flex items-center justify-between gap-2">
