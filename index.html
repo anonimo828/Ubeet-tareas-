@@ -572,6 +572,7 @@ function Dashboard({ user, data, setData, onLogout, error }) {
   const tabsByRole = {
     dueno: [
       { id: "premios", label: "Premios" },
+      { id: "ranking", label: "Ranking" },
       { id: "canjes", label: "Canjes" },
       { id: "personas", label: "Personas" },
       { id: "logros", label: "Logros" },
@@ -580,11 +581,13 @@ function Dashboard({ user, data, setData, onLogout, error }) {
     ],
     maestro: [
       { id: "tareas", label: "Tareas" },
+      { id: "ranking", label: "Ranking" },
       { id: "personas", label: "Personas" },
       { id: "mensajes", label: "Mensajes" },
     ],
     estudiante: [
       { id: "tareas", label: "Tareas" },
+      { id: "ranking", label: "Ranking" },
       { id: "entregas", label: "Mis entregas" },
       { id: "premios", label: "Premios" },
       { id: "canjes", label: "Mis canjes" },
@@ -629,7 +632,8 @@ function Dashboard({ user, data, setData, onLogout, error }) {
       {tab === "mensajes" && <MessagesTab data={data} setData={setData} user={user} />}
       {tab === "confesiones" && <ConfessionsTab data={data} setData={setData} user={user} />}
       {tab === "logros" && <LogrosTab data={data} user={user} />}
-      {tab !== "mensajes" && tab !== "confesiones" && tab !== "logros" && (
+      {tab === "ranking" && <LeaderboardTab data={data} user={user} />}
+      {tab !== "mensajes" && tab !== "confesiones" && tab !== "logros" && tab !== "ranking" && (
         <>
           {user.role === "dueno" && <OwnerView data={data} setData={setData} user={user} tab={tab} />}
           {user.role === "maestro" && <TeacherView data={data} setData={setData} user={user} tab={tab} />}
@@ -734,6 +738,103 @@ function EmptyState({ icon: Icon, text }) {
       <Icon size={26} style={{ color: COLORS.inkSoft, opacity: 0.5, marginBottom: 8 }} />
       <p style={{ color: COLORS.inkSoft, fontSize: 13 }}>{text}</p>
     </div>
+  );
+}
+
+/* ---------------- AVATARES, ÍCONOS DE PREMIO Y BARRAS DE PROGRESO ---------------- */
+
+function initials(name) {
+  return (name || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
+
+function Avatar({ name, size, ring }) {
+  const s = size || 36;
+  return (
+    <div
+      style={{
+        width: s,
+        height: s,
+        borderRadius: "50%",
+        background: COLORS.paper,
+        border: `2px solid ${ring || COLORS.line}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: COLORS.ink,
+        fontWeight: 700,
+        fontSize: s * 0.36,
+        flexShrink: 0,
+        ...font.display,
+      }}
+    >
+      {initials(name)}
+    </div>
+  );
+}
+
+const REWARD_COLORS = [COLORS.pink, COLORS.gold, COLORS.green, "#4C8FE0"];
+function rewardColor(i) {
+  return REWARD_COLORS[i % REWARD_COLORS.length];
+}
+
+function RewardIcon({ color, size }) {
+  const s = size || 44;
+  return (
+    <div
+      style={{
+        width: s,
+        height: s,
+        background: color,
+        borderRadius: 10,
+        transform: "rotate(45deg)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: `0 4px 10px ${color}55`,
+      }}
+    >
+      <span style={{ transform: "rotate(-45deg)", display: "inline-flex" }}>
+        <Gift size={s * 0.42} color={COLORS.white} />
+      </span>
+    </div>
+  );
+}
+
+function ProgressCard({ icon, color, title, subtitle, progress }) {
+  return (
+    <Card>
+      <div className="flex items-center gap-3">
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: color,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{title}</div>
+          <div style={{ color: COLORS.inkSoft, fontSize: 11 }} className="truncate">
+            {subtitle}
+          </div>
+          <div className="mt-1.5" style={{ height: 6, borderRadius: 3, background: COLORS.line, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, Math.round(progress * 100)))}%`, background: color }} />
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -922,6 +1023,120 @@ function LogrosTab({ data, user }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- LEADERBOARD ---------------- */
+
+function periodStart(period) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (period === "week") {
+    const day = d.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    d.setDate(d.getDate() - diff);
+  } else if (period === "month") {
+    d.setDate(1);
+  }
+  return d.getTime();
+}
+
+function getEarnedInPeriod(data, userId, since) {
+  const fromTasks = data.submissions
+    .filter((s) => s.studentId === userId && s.status === "aprobado" && (s.reviewedAt || s.at) >= since)
+    .reduce((sum, s) => sum + s.points, 0);
+  const fromGrants = (data.grants || [])
+    .filter((g) => g.toId === userId && g.at >= since)
+    .reduce((sum, g) => sum + g.amount, 0);
+  const fromTransfers = (data.transfers || [])
+    .filter((t) => t.toId === userId && t.at >= since)
+    .reduce((sum, t) => sum + t.amount, 0);
+  return fromTasks + fromGrants + fromTransfers;
+}
+
+const PODIUM_RING = [COLORS.gold, "#C7CBD6", "#C97A3D"];
+
+function LeaderboardTab({ data, user }) {
+  const [period, setPeriod] = useState("week");
+  const since = periodStart(period);
+
+  const ranked = (data.people || [])
+    .filter((p) => p.role === "estudiante")
+    .map((p) => ({ ...p, pts: getEarnedInPeriod(data, p.id, since) }))
+    .sort((a, b) => b.pts - a.pts);
+
+  const top3 = ranked.slice(0, 3);
+  const rest = ranked.slice(3);
+  const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3;
+
+  const periods = [
+    { id: "today", label: "Hoy" },
+    { id: "week", label: "Semana" },
+    { id: "month", label: "Mes" },
+  ];
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-5 p-1 rounded-lg" style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}` }}>
+        {periods.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPeriod(p.id)}
+            className="flex-1 py-2 rounded-md text-xs font-semibold transition"
+            style={{ background: period === p.id ? COLORS.green : "transparent", color: period === p.id ? COLORS.white : COLORS.inkSoft }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {ranked.length === 0 && <EmptyState icon={Crown} text="Todavía no hay estudiantes con puntos en este periodo." />}
+
+      {top3.length > 0 && (
+        <div className="flex items-end justify-center gap-3 mb-5 pt-2">
+          {podiumOrder.map((p) => {
+            if (!p) return null;
+            const place = top3.indexOf(p) + 1;
+            const height = place === 1 ? 88 : place === 2 ? 64 : 50;
+            return (
+              <div key={p.id} className="flex flex-col items-center" style={{ width: 84 }}>
+                {place === 1 && <Crown size={18} color={COLORS.gold} style={{ marginBottom: 2 }} />}
+                <Avatar name={p.name} size={place === 1 ? 54 : 44} ring={PODIUM_RING[place - 1]} />
+                <div style={{ color: COLORS.ink, fontSize: 12, fontWeight: 600, textAlign: "center", width: "100%" }} className="mt-1 truncate">
+                  {p.name}
+                </div>
+                <div style={{ ...font.mono, color: COLORS.gold, fontSize: 11 }}>{p.pts} pts</div>
+                <div
+                  className="mt-1 rounded-t-md w-full flex items-start justify-center pt-1"
+                  style={{ height, background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, borderBottom: "none" }}
+                >
+                  <span style={{ ...font.display, color: COLORS.inkSoft, fontWeight: 700, fontSize: 18 }}>{place}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {rest.map((p, i) => {
+        const isMe = p.id === user.id;
+        return (
+          <Card key={p.id} style={isMe ? { border: `1px solid ${COLORS.green}` } : undefined}>
+            <div className="flex items-center gap-3">
+              <div style={{ ...font.mono, color: COLORS.inkSoft, fontSize: 13, width: 18, textAlign: "center" }}>{i + 4}</div>
+              <Avatar name={p.name} size={34} />
+              <div className="flex-1 min-w-0">
+                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }} className="truncate">
+                  {p.name}
+                  {isMe && <span style={{ color: COLORS.inkSoft, fontWeight: 400 }}> (tú)</span>}
+                </div>
+              </div>
+              <PointsBadge points={p.pts} />
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -1331,30 +1546,63 @@ function StudentView({ data, setData, user, tab }) {
   }
 
   if (tab === "premios") {
+    const total = getTotalEarned(data, user.id);
+    const rank = getRank(total);
+    const nextReward = data.rewards
+      .filter((r) => r.cost > balance)
+      .sort((a, b) => a.cost - b.cost)[0];
+
     return (
       <div>
         <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: COLORS.inkSoft, fontSize: 13 }}>Tu saldo actual</span>
           <PointsBadge points={balance} />
         </Card>
+
+        <Eyebrow>Tu progreso</Eyebrow>
+        <ProgressCard
+          icon={<span style={{ fontSize: 20 }}>{rank.icon}</span>}
+          color="#4C8FE0"
+          title={rank.name}
+          subtitle={rank.next ? `Faltan ${rank.next.min - total} pts para ${rank.next.name}` : "Alcanzaste el rango máximo"}
+          progress={rank.progress}
+        />
+        {nextReward && (
+          <ProgressCard
+            icon={<Gift size={18} color={COLORS.white} />}
+            color={COLORS.pink}
+            title={nextReward.name}
+            subtitle={`Te faltan ${nextReward.cost - balance} pts para canjearlo`}
+            progress={balance / nextReward.cost}
+          />
+        )}
+
         <Eyebrow>Premios disponibles</Eyebrow>
         {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
-        {data.rewards.map((r) => {
-          const canAfford = balance >= r.cost;
-          return (
-            <Card key={r.id}>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.name}</div>
-                  <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
-                </div>
-                <button onClick={() => redeem(r)} className="px-3 py-2 rounded-md text-xs flex items-center gap-1" style={goldBtnStyle(canAfford)} disabled={!canAfford}>
-                  <Gift size={13} /> Canjear
+        <div className="grid grid-cols-2 gap-3">
+          {data.rewards.map((r, i) => {
+            const canAfford = balance >= r.cost;
+            return (
+              <div
+                key={r.id}
+                className="rounded-xl p-3 flex flex-col items-center text-center gap-1.5"
+                style={{ background: COLORS.paperDark, border: `1px solid ${COLORS.line}`, opacity: canAfford ? 1 : 0.55 }}
+              >
+                <RewardIcon color={rewardColor(i)} />
+                <div style={{ color: COLORS.ink, fontSize: 13, fontWeight: 600, lineHeight: 1.25 }}>{r.name}</div>
+                <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+                <button
+                  onClick={() => redeem(r)}
+                  className="w-full py-2 rounded-md text-xs flex items-center justify-center gap-1 mt-1"
+                  style={goldBtnStyle(canAfford)}
+                  disabled={!canAfford}
+                >
+                  <Gift size={12} /> Canjear
                 </button>
               </div>
-            </Card>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -1482,12 +1730,15 @@ function OwnerView({ data, setData, user, tab }) {
 
       <Eyebrow>Premios actuales</Eyebrow>
       {data.rewards.length === 0 && <EmptyState icon={Gift} text="Todavía no hay premios cargados." />}
-      {data.rewards.map((r) => (
+      {data.rewards.map((r, i) => (
         <Card key={r.id}>
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.name}</div>
-              <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+            <div className="flex items-center gap-3">
+              <RewardIcon color={rewardColor(i)} size={36} />
+              <div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.name}</div>
+                <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
+              </div>
             </div>
             <button onClick={() => deleteReward(r.id)} style={{ color: COLORS.red }} title="Eliminar premio">
               <Trash2 size={15} />
