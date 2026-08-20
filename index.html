@@ -96,16 +96,16 @@ const OWNER_PASSWORD = "ubeet.tareas123";
 const TEACHER_PASSWORD = "UBEET.DIOS.ES.VIDA";
 
 const COLORS = {
-  paper: "#0B0C0A",
-  paperDark: "#171814",
-  ink: "#EDEFE7",
-  inkSoft: "#A9AE9E",
+  paper: "#08090A",
+  paperDark: "#131513",
+  ink: "#F5F4EC",
+  inkSoft: "#8D9186",
   green: "#4C8A54",
   greenDark: "#2F5233",
   red: "#D6564A",
-  gold: "#D9A62E",
+  gold: "#E0B03A",
   goldSoft: "#E8C875",
-  line: "#33362C",
+  line: "#2A2C24",
   white: "#FBFAF6",
 };
 
@@ -114,6 +114,35 @@ const font = {
   body: { fontFamily: "'Inter', sans-serif" },
   mono: { fontFamily: "'IBM Plex Mono', monospace" },
 };
+
+// Tipografía protagonista: el número de puntos es el elemento más grande de toda la interfaz.
+function BigNumber({ value, label, color }) {
+  return (
+    <div style={{ textAlign: "center", padding: "6px 0 18px" }}>
+      <div
+        style={{
+          ...font.display,
+          fontWeight: 700,
+          color: color || COLORS.gold,
+          fontSize: "clamp(72px, 22vw, 168px)",
+          lineHeight: 0.86,
+          letterSpacing: "-0.035em",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+      {label && (
+        <div
+          style={{ ...font.mono, fontSize: 12, letterSpacing: 3, color: COLORS.inkSoft }}
+          className="uppercase mt-1"
+        >
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SHADOW = "0 1px 2px rgba(32,38,31,0.06), 0 2px 6px rgba(32,38,31,0.04)";
 
@@ -356,19 +385,22 @@ function Login({ onEnter }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="flex items-center gap-3 mb-8 justify-center">
-          <div
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 44, height: 44, background: COLORS.green, boxShadow: SHADOW }}
+        <div className="mb-8 text-center">
+          <h1
+            style={{
+              ...font.display,
+              color: COLORS.ink,
+              fontWeight: 700,
+              fontSize: "clamp(48px, 14vw, 88px)",
+              lineHeight: 0.88,
+              letterSpacing: "-0.03em",
+            }}
           >
-            <Stamp size={22} color={COLORS.white} />
-          </div>
-          <div>
-            <h1 style={{ ...font.display, color: COLORS.ink, fontSize: 26, lineHeight: 1.1 }}>Ubeetareas</h1>
-            <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 1 }} className="uppercase">
-              Tareas, mérito y recompensas
-            </p>
-          </div>
+            Ubeet<span style={{ color: COLORS.gold }}>areas</span>
+          </h1>
+          <p style={{ ...font.mono, fontSize: 11, color: COLORS.inkSoft, letterSpacing: 3 }} className="uppercase mt-3">
+            Tareas · mérito · recompensas
+          </p>
         </div>
 
         <div
@@ -482,15 +514,11 @@ function Dashboard({ user, data, setData, onLogout, error }) {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pb-16">
-      <header className="flex items-center justify-between gap-3 py-5 mb-2 flex-wrap" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: COLORS.green }}>
-            <Stamp size={16} color={COLORS.white} />
-          </div>
-          <span style={{ ...font.display, fontSize: 19, color: COLORS.ink }}>Ubeetareas</span>
-        </div>
+      <header className="flex items-center justify-between gap-3 pt-5 pb-3 flex-wrap">
+        <span style={{ ...font.display, fontWeight: 700, fontSize: 20, color: COLORS.ink, letterSpacing: "-0.02em" }}>
+          Ubeet<span style={{ color: COLORS.gold }}>areas</span>
+        </span>
         <div className="flex items-center gap-3">
-          <PointsBadge points={getBalance(data, user.id)} />
           <div className="text-right">
             <div style={{ color: COLORS.ink, fontSize: 13, fontWeight: 600 }}>{user.name}</div>
             <div style={{ ...font.mono, fontSize: 10, color: COLORS.inkSoft }} className="uppercase">
@@ -502,6 +530,10 @@ function Dashboard({ user, data, setData, onLogout, error }) {
           </button>
         </div>
       </header>
+
+      <div style={{ borderBottom: `1px solid ${COLORS.line}` }} className="mb-2 pb-1">
+        <BigNumber value={getBalance(data, user.id)} label="Tus puntos" />
+      </div>
 
       {error && (
         <div className="mb-4 p-2 rounded-md text-sm" style={{ background: "#F3DEDC", color: COLORS.red }}>
@@ -560,7 +592,7 @@ function Eyebrow({ children }) {
 
 function PointsBadge({ points }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ ...font.mono, background: "#F3E9CE", color: COLORS.gold, fontWeight: 600, fontSize: 13 }}>
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ ...font.mono, background: "#F3E9CE", color: "#8A6A16", fontWeight: 700, fontSize: 14 }}>
       <Coins size={13} /> {points}
     </span>
   );
@@ -843,7 +875,7 @@ function TeacherView({ data, setData, user, tab }) {
             <Card key={s.id}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{s.taskTitle}</div>
+                  <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{s.taskTitle}</div>
                   <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>
                     {s.studentName} · {s.points} pts
                   </div>
@@ -871,7 +903,7 @@ function TeacherView({ data, setData, user, tab }) {
           <Card key={t.id}>
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{t.title}</div>
                 {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
               </div>
               <div className="flex items-center gap-2">
@@ -939,7 +971,7 @@ function StudentView({ data, setData, user, tab }) {
           <Card key={s.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{s.taskTitle}</div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{s.taskTitle}</div>
                 <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{s.points} pts</div>
               </div>
               <StampBadge status={s.status} />
@@ -962,7 +994,7 @@ function StudentView({ data, setData, user, tab }) {
           <Card key={r.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.rewardName}</div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.rewardName}</div>
                 <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
                 {r.status === "rechazado" && (
                   <div style={{ color: COLORS.inkSoft, fontSize: 11, marginTop: 2 }}>Se te devolvieron los puntos.</div>
@@ -991,7 +1023,7 @@ function StudentView({ data, setData, user, tab }) {
             <Card key={r.id}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+                  <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.name}</div>
                   <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
                 </div>
                 <button onClick={() => redeem(r)} className="px-3 py-2 rounded-md text-xs flex items-center gap-1" style={goldBtnStyle(canAfford)} disabled={!canAfford}>
@@ -1020,7 +1052,7 @@ function StudentView({ data, setData, user, tab }) {
             <Card key={t.id}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{t.title}</div>
+                  <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{t.title}</div>
                   {t.description && <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>{t.description}</div>}
                   <div style={{ color: COLORS.inkSoft, fontSize: 11 }}>Por {t.createdByName}</div>
                 </div>
@@ -1079,7 +1111,7 @@ function OwnerView({ data, setData, user, tab }) {
           <Card key={r.id}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.rewardName}</div>
+                <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.rewardName}</div>
                 <div style={{ color: COLORS.inkSoft, fontSize: 12 }}>
                   {r.studentName} · {r.cost} pts
                 </div>
@@ -1131,7 +1163,7 @@ function OwnerView({ data, setData, user, tab }) {
         <Card key={r.id}>
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div style={{ color: COLORS.ink, fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+              <div style={{ ...font.display, color: COLORS.ink, fontSize: 16, fontWeight: 700 }}>{r.name}</div>
               <div style={{ ...font.mono, color: COLORS.gold, fontSize: 12 }}>{r.cost} pts</div>
             </div>
             <button onClick={() => deleteReward(r.id)} style={{ color: COLORS.red }} title="Eliminar premio">
